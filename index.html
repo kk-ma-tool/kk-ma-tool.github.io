@@ -1,0 +1,524 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>乖乖值計算器</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700;900&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#EEF4EC; --panel:#FFFFFF; --ink:#18261B; --sub:#5B6B5E; --line:#CFDCCD;
+  --green:#2E8B3E; --five:#D9A21B; --mid:#8FA33A; --warn:#E07B24; --hot:#C8312B; --cold:#3D7FB0;
+  box-sizing:border-box; padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#121A14; --panel:#1B261E; --ink:#E6EFE6; --sub:#9AAE9D; --line:#2F4033;
+    --green:#4FB861; --five:#F0C040; --mid:#B2C55A; --warn:#F2954A; --hot:#EF5B52; --cold:#6BA9D6;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#121A14; --panel:#1B261E; --ink:#E6EFE6; --sub:#9AAE9D; --line:#2F4033;
+  --green:#4FB861; --five:#F0C040; --mid:#B2C55A; --warn:#F2954A; --hot:#EF5B52; --cold:#6BA9D6;
+}
+*,*::before,*::after{box-sizing:inherit}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--ink);
+  font-family:"Noto Sans TC","PingFang TC","Microsoft JhengHei",sans-serif;line-height:1.6;font-variant-numeric:tabular-nums}
+main{max-width:760px;margin:0 auto;padding:24px 16px 48px}
+h1{font-size:2rem;font-weight:900;margin:0 0 4px;color:var(--green);letter-spacing:.02em}
+.lead{color:var(--sub);margin:0 0 20px}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px;margin-bottom:16px}
+label{font-weight:700;display:block;margin-bottom:6px}
+input,textarea{width:100%;font:inherit;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:10px}
+textarea{min-height:180px;font-size:.95rem}
+.hint{font-size:.88rem;color:var(--sub);margin:8px 0 0}
+.hint code{background:var(--bg);padding:1px 5px;border-radius:4px}
+.row{display:flex;gap:10px;flex-wrap:wrap;margin-top:12px}
+button{font:inherit;font-weight:700;border:0;border-radius:999px;padding:10px 22px;cursor:pointer;background:var(--green);color:#fff}
+button.ghost{background:transparent;color:var(--ink);border:1px solid var(--line)}
+button:focus-visible,input:focus-visible,textarea:focus-visible{outline:3px solid var(--five);outline-offset:2px}
+.err{color:var(--hot);font-weight:700;margin-top:10px}
+.big{display:flex;align-items:flex-end;gap:16px;flex-wrap:wrap}
+.num{font-size:4.2rem;font-weight:900;line-height:1}
+.badge{display:inline-block;padding:4px 14px;border-radius:999px;color:#fff;font-weight:700;margin-bottom:8px}
+.facts{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px;margin-top:14px}
+.fact{border-top:3px solid var(--line);padding-top:8px}
+.fact b{display:block;font-size:1.25rem}
+.fact span{color:var(--sub);font-size:.9rem}
+.checks{list-style:none;padding:0;margin:10px 0 0}
+.checks li{padding:6px 0;border-bottom:1px dashed var(--line)}
+.ok{color:var(--green);font-weight:700}.no{color:var(--hot);font-weight:700}.na{color:var(--sub);font-weight:700}
+.scroll{overflow-x:auto}
+table{border-collapse:collapse;width:100%;min-width:520px;font-size:.92rem}
+th,td{padding:7px 8px;text-align:right;border-bottom:1px solid var(--line);white-space:nowrap}
+th:first-child,td:first-child{text-align:left}
+th{color:var(--sub);font-weight:500}
+.dot{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:6px;vertical-align:middle}
+.legend{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:.88rem;color:var(--sub);margin-top:8px}
+svg{max-width:100%;display:block}
+h2{font-size:1.15rem;margin:0 0 10px}
+.note{font-size:.88rem;color:var(--sub)}
+table.flow{min-width:0}
+table.flow th{text-align:left;white-space:nowrap;vertical-align:top;color:var(--sub);width:6.5em}
+table.flow td{text-align:left;white-space:normal;line-height:1.7}
+</style>
+</head>
+<body>
+<main>
+  <h1 style="text-align:center;letter-spacing:.3em;padding-left:.3em">乖乖值計算器</h1>
+  <p class="lead" style="text-align:center">短期乖乖＝5日線÷10日線，中期乖乖＝10日線÷20日線</p>
+
+  <section class="panel">
+    <h2>輸入代號或名稱，自動抓證交所／櫃買中心收盤價</h2>
+    <label for="code">股票代號或名稱（上市、上櫃都可以）</label>
+    <input id="code" placeholder="例如 2408 或 南亞科">
+    <div class="row"><button id="auto">抓資料並計算</button></div>
+    <p class="hint" id="autoMsg">資料每個交易日收盤後自動更新（約下午 4 點）。</p>
+    <div id="pick" class="row"></div>
+    <div id="err" class="err" hidden></div>
+  </section>
+
+  <input id="name" type="hidden" value="">
+
+  <div id="out" hidden>
+    <section class="panel" id="summary"></section>
+    <section class="panel">
+      <h2>乖乖走勢</h2>
+      <div id="chart" class="scroll"></div>
+      <div class="legend" id="legend"></div>
+    </section>
+    <section class="panel">
+      <h2>每日明細</h2>
+      <div class="scroll"><table id="tbl"></table></div>
+    </section>
+  </div>
+
+  <p class="note">依原作者<b style="font-size:2em;margin:0 .15em;vertical-align:-0.1em;background:linear-gradient(90deg,#3D7FB0,#D9A21B,#8FA33A,#E07B24,#C8312B);-webkit-background-clip:text;background-clip:text;color:transparent">精靈良少</b>說法：乖乖只是參考依據，不是絕對；每檔股性不同，最好先回頭看這檔過去「起漲到回落」時乖乖怎麼變化。5日線跌到10日線下面時（數字變負），這套看法不適用。</p>
+  <p class="note" style="margin-top:6px">資料來源：臺灣證券交易所、證券櫃檯買賣中心（每個交易日收盤後自動更新）。</p>
+</main>
+
+<script>
+// 取代 Google 版的 google.script.run：改讀每天自動更新的資料檔
+(function () {
+  var PX = null, ST = '', EX = {};
+  function load() {
+    if (PX) return Promise.resolve();
+    return Promise.all([
+      fetch('data/px.json', {cache: 'no-cache'}).then(function (r) { return r.json(); }),
+      fetch('data/stats.txt').then(function (r) { return r.text(); }),
+      fetch('data/ex.json', {cache: 'no-cache'}).then(function (r) { return r.json(); })
+    ]).then(function (a) { PX = a[0]; ST = a[1]; EX = a[2]; });
+  }
+  function stat(code) {
+    var i = ST.indexOf(';' + code + ':');
+    if (i < 0) return null;
+    var v = ST.slice(i + code.length + 2, ST.indexOf(';', i + 1)).split(',');
+    var n = function (x, d) { return x === '' ? null : +x / d; };
+    return {S: n(v[0], 10), S2: n(v[1], 10), n: +v[2], M: n(v[3], 10), P75: n(v[4], 10), dd: n(v[5], 10), b10: v[6] === '' ? null : +v[6], days: +v[7]};
+  }
+  function getData(code) {
+    code = String(code || '').trim().toUpperCase();
+    if (!/^[0-9A-Z]{4,6}$/.test(code)) return {error: '代號格式不對，請輸入像 2408 這樣的股票代號。'};
+    var c = PX.c[code];
+    if (!c) return {error: '找不到代號 ' + code + ' 的資料（只收上市、上櫃的股票和ETF）。'};
+    var idx = [];
+    for (var i = 0; i < PX.d.length; i++) if (c[i] != null) idx.push(i);
+    idx = idx.slice(-80);
+    if (!idx.length) return {error: '代號 ' + code + ' 最近沒有成交資料。'};
+    var ks = idx.map(function (i) { return PX.d[i]; }), px = {};
+    idx.forEach(function (i) { px[PX.d[i]] = c[i]; });
+    var used = 0, miss = 0;
+    (EX[code] || []).forEach(function (e) {
+      var k = e[0], r = e[1];
+      if (k <= ks[0] || k > ks[ks.length - 1]) return;
+      if (r == null || !(r > 0.3 && r < 1.5)) { miss++; return; }
+      used++;
+      ks.forEach(function (x) { if (x < k) px[x] = px[x] * r; });
+    });
+    var note = used ? '（期間內有 ' + used + ' 次除權息，已做還原）' : '';
+    if (miss) note += '（有 ' + miss + ' 次除權息查不到配息資料，該次未還原）';
+    var L = ks[ks.length - 1];
+    return {
+      stat: stat(code), adjNote: note, code: code, name: PX.n[code] || '', market: PX.m[code] || '',
+      last: Math.floor(L / 10000) + '/' + (Math.floor(L / 100) % 100) + '/' + (L % 100),
+      rows: ks.map(function (k) { return {date: (Math.floor(k / 100) % 100) + '/' + (k % 100), close: px[k]}; })
+    };
+  }
+  function findStock(q, all) {
+    q = String(q || '').replace(/\s+/g, '').toUpperCase();
+    if (!q) return [];
+    var list = Object.keys(PX.n).map(function (c) { return [c, PX.n[c]]; });
+    var exact = list.filter(function (s) { return s[1].toUpperCase() === q; });
+    if (exact.length && !all) return exact.slice(0, 1);
+    var hits = list.filter(function (s) { return s[1].toUpperCase().indexOf(q) >= 0; });
+    if (all) hits.sort(function (a, b) { return (a[1].toUpperCase().indexOf(q) === 0 ? 0 : 1) - (b[1].toUpperCase().indexOf(q) === 0 ? 0 : 1); });
+    return hits.slice(0, 12);
+  }
+  function call(fn, args, ok, bad) {
+    load().then(function () { return fn.apply(null, args); })
+      .then(function (r) { if (ok) ok(r); })
+      .catch(function (e) { if (bad) bad(e); });
+  }
+  function runner(ok, bad) {
+    return {
+      withSuccessHandler: function (f) { return runner(f, bad); },
+      withFailureHandler: function (f) { return runner(ok, f); },
+      getData: function (c) { call(getData, [c], ok, bad); },
+      findStock: function (q, a) { call(findStock, [q, a], ok, bad); }
+    };
+  }
+  window.google = {script: {run: runner(null, null)}};
+})();
+</script>
+<script>
+const $ = id => document.getElementById(id);
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+
+// 作者算法：(5MA/10MA - 1) × 100，小數點後一位「直接捨去」(1.1129 → 11.2)
+function kk(a, b){
+  if (a == null || b == null || !b) return null;
+  const v = (a / b - 1) * 100;
+  return Math.trunc(v * 10 + (v >= 0 ? 1e-9 : -1e-9)) / 10;
+}
+// 區間標準：作者原始為 4／7／9／11；有個股股性時，依這檔過去的乖乖幅度等比例調整
+const r1 = x => Math.round(x * 10) / 10;
+function mkTH(k){ return {k, fl: r1(4 * k), fh: r1(7 * k), w: r1(9 * k), h: r1(11 * k)}; }
+let TH = mkTH(1), TH2 = mkTH(1), STAT = null, MODE = 'manual';
+function zone(v, t = TH){
+  if (v == null) return {t:'—', c:'--line'};
+  if (v < 0)  return {t:'5日線在10日線下（不適用）', c:'--sub'};
+  if (v < t.fl)  return {t:'低檔乖乖・更好（視情況）', c:'--cold'};
+  if (v <= t.fh) return {t:'5香乖乖', c:'--five'};
+  if (v < t.w)  return {t:'過渡區（偏熱）', c:'--mid'};
+  if (v < t.h) return {t:'警戒', c:'--warn'};
+  return {t:'辣味乖乖・短線隨時落跑、不適合波段', c:'--hot'};
+}
+function legend(){
+  $('legend').innerHTML = `
+    <span><i class="dot" style="background:var(--cold)"></i>${TH.fl} 以下：更好（視情況）</span>
+    <span><i class="dot" style="background:var(--five)"></i>${TH.fl}–${TH.fh}：5香乖乖</span>
+    <span><i class="dot" style="background:var(--mid)"></i>${TH.fh}–${TH.w}：過渡</span>
+    <span><i class="dot" style="background:var(--warn)"></i>${TH.w}–${TH.h}：警戒</span>
+    <span><i class="dot" style="background:var(--hot)"></i>${TH.h} 以上：辣味乖乖</span>`;
+}
+const ma = (arr, i, n) => {
+  if (i < n - 1) return null;
+  let s = 0; for (let k = i - n + 1; k <= i; k++){ if (arr[k] == null) return null; s += arr[k]; }
+  return s / n;
+};
+const f = (v, d = 2) => v == null ? '—' : String(Number((+v).toFixed(d)));
+
+function parse(text){
+  const rows = [];
+  text.split(/\r?\n/).forEach((line, idx) => {
+    line = line.trim(); if (!line) return;
+    const tok = line.split(/[\s,，\t]+/).filter(Boolean);
+    let date = `第${rows.length + 1}天`;
+    if (tok.length && /[\/\-年月]/.test(tok[0])) date = tok.shift();
+    const n = tok.map(x => parseFloat(x.replace(/[^\d.\-]/g, '')));
+    if (!n.length || n.some(isNaN)) throw `第 ${idx + 1} 行看不懂：「${line}」`;
+    const r = {date, close:null, m5:null, m10:null, m20:null};
+    if (n.length === 1) r.close = n[0];
+    else if (n.length === 2) [r.m5, r.m10] = n;
+    else if (n.length === 3) [r.m5, r.m10, r.m20] = n;
+    else [r.close, r.m5, r.m10, r.m20] = n;
+    rows.push(r);
+  });
+  if (!rows.length) throw '還沒貼資料';
+  return compute(rows);
+}
+function compute(rows){
+  // 只有收盤價的行：自己算均線
+  const closes = rows.map(r => r.close);
+  rows.forEach((r, i) => {
+    if (r.m5 == null && r.close != null){
+      r.m5 = ma(closes, i, 5); r.m10 = ma(closes, i, 10); r.m20 = ma(closes, i, 20);
+    }
+    r.s = kk(r.m5, r.m10); r.m = kk(r.m10, r.m20);
+  });
+  return rows;
+}
+
+function run(){
+  $('err').hidden = true;
+  let rows;
+  STAT = null; TH = mkTH(1); TH2 = mkTH(1); MODE = 'manual';
+  try { rows = parse($('data').value); } catch(e){ $('err').textContent = e; $('err').hidden = false; $('out').hidden = true; return; }
+  render(rows);
+}
+function render(rows){
+  const valid = rows.filter(r => r.s != null);
+  if (!valid.length){
+    $('err').textContent = '資料不夠算短期乖乖：只貼收盤價的話至少要 10 天。';
+    $('err').hidden = false; $('out').hidden = true; return;
+  }
+  $('out').hidden = false;
+  summary(rows, valid);
+  chart(valid);
+  table(rows);
+}
+
+function summary(rows, valid){
+  legend();
+  const last = valid[valid.length - 1], z = zone(last.s), li = rows.indexOf(last);
+  const prev = valid.length > 1 ? valid[valid.length - 2] : null;
+  const cl = rows.slice(0, li + 1).map(r => r.close);
+  const hasClose = cl.length && cl.every(v => v != null);
+  // 平均變化
+  let down = 0;
+  for (let i = valid.length - 1; i > 0 && valid[i].s < valid[i - 1].s; i--) down++;
+  const ch = []; for (let i = Math.max(1, valid.length - 5); i < valid.length; i++) ch.push(valid[i].s - valid[i - 1].s);
+  const avg = ch.length ? ch.reduce((a, b) => a + b, 0) / ch.length : null;
+  const avgTxt = avg == null ? '—' : (Math.abs(avg) < 0.05 ? '0.0（持平）' : (avg > 0 ? '+' : '') + avg.toFixed(1) + (avg < 0 ? '（縮減中）' : '（擴大中）'));
+  // 預測
+  let pred = '需要收盤價才能算';
+  if (hasClose && cl.length >= 10 && last.m5 && last.m10){
+    const R = last.m5 / last.m10, s4 = cl.slice(-4).reduce((a,b)=>a+b,0), s9 = cl.slice(-9).reduce((a,b)=>a+b,0);
+    const x = (R * s9 - 2 * s4) / (2 - R);
+    pred = `明天收盤<b>低於約 ${f(x)} 元</b>，乖乖會縮小；高於這個價，乖乖會變大。` + (x > last.close * 1.1 || x < last.close * 0.9 ? '（這個價超過明天的漲跌停範圍，明天乖乖不會改變方向。）' : '');
+  }
+  let eta = '';
+  if (last.s > TH.fh){
+    eta = (avg != null && avg < 0) ? `照目前平均速度，大約 <b>${Math.ceil((last.s - TH.fh) / -avg)} 天</b>會降回這檔的5香區（${TH.fh} 以下）。` : `目前沒有在縮減，還估不出何時回到5香區（${TH.fh} 以下）。`;
+  } else if (last.s >= 0) eta = `已經在這檔的5香區上緣（${TH.fh}）以下。`;
+  // 支撐／介入區
+  let sup = `5日線約 <b>${f(last.m5)}</b> 元、10日線約 <b>${f(last.m10)}</b> 元。`;
+  if (hasClose && STAT && STAT.dd != null){
+    const H = Math.max(...cl.slice(-10)), W = H * (1 + STAT.dd / 100);
+    sup += `<br>近10天最高收盤 ${f(H)} 元；這檔乖乖到高點後，10天內通常回檔約 ${Math.abs(STAT.dd).toFixed(1)}%，換算約 <b>${f(W)}</b> 元。` +
+           (STAT.b10 != null ? `過去約 ${STAT.b10}% 的情況會跌回10日線附近。` : '');
+  }
+  // 收盤離各均線多少 %
+  if (hasClose && last.m20 != null){
+    const pc2 = m => { const v = (last.close / m - 1) * 100; return (v >= 0 ? "+" : "") + v.toFixed(1) + "%"; };
+    sup += `<br>收盤 ${f(last.close)} 元，離5日線 ${pc2(last.m5)}、離10日線 ${pc2(last.m10)}、離20日線 ${pc2(last.m20)}。`;
+  }
+  // 未來3天支撐帶：假設收盤不動，算10日線、20日線會在哪
+  if (hasClose && cl.length >= 20){
+    const c3 = cl.slice(), band = [];
+    for (let d = 1; d <= 3; d++){
+      c3.push(cl[cl.length - 1]); const n = c3.length;
+      const a10 = c3.slice(n - 10).reduce((a, b) => a + b, 0) / 10, a20 = c3.slice(n - 20).reduce((a, b) => a + b, 0) / 20;
+      band.push(`第${d}天 <b>${f(Math.min(a10, a20))}～${f(Math.max(a10, a20))}</b>`);
+    }
+    sup += `<br>未來3天支撐帶（20日線～10日線之間，假設收盤不動）：${band.join("、")} 元。強勢回檔通常在上緣附近止穩，跌深再看下緣。`;
+  }
+  let chk = '';
+  if (hasClose && last.m5 != null){
+    const pc = cl.slice(Math.max(0, li - 3), li), lo = pc.length ? Math.min(...pc) : null;
+    const yn = (b, y, n) => b ? `<span class="ok">${y}</span>` : `<span class="no">${n}</span>`;
+    chk = `<br>乖乖比前一天縮減：${prev ? yn(last.s < prev.s, '有' + (down ? `（連續 ${down} 天）` : ''), '沒有') : '—'}；` +
+          `收盤站在5日線上：${yn(last.close >= last.m5, '有', '跌破')}；` +
+          `沒破前3天最低收盤${lo != null ? '（' + f(lo) + '）' : ''}：${lo == null ? '—' : yn(last.close >= lo, '沒破', '破了')}`;
+  }
+  // 延伸分析：假設之後 5 天收盤都不動
+  let ext = '需要收盤價才能算';
+  if (hasClose && cl.length >= 10){
+    const c2 = cl.slice(), arr = [];
+    for (let d = 0; d < 5; d++){
+      c2.push(cl[cl.length - 1]);
+      const n = c2.length, m5 = c2.slice(n-5).reduce((a,b)=>a+b,0)/5, m10 = c2.slice(n-10).reduce((a,b)=>a+b,0)/10;
+      arr.push(f(kk(m5, m10), 1));
+    }
+    ext = `如果接下來5天收盤都維持 ${f(cl[cl.length - 1])} 元，乖乖會變成：${arr.join(' → ')}`;
+  }
+  // 短期、中期乖乖一起看
+  let dual = "需要20日線";
+  if (prev && last.m !== null && prev.m !== null){
+    const sUp = last.s > prev.s, sDn = last.s < prev.s, mUp = last.m > prev.m, mDn = last.m < prev.m;
+    dual = sUp && mUp ? "短期、中期乖乖<b>一起變大</b>：整體力道在加強。"
+      : sDn && mDn ? "短期、中期乖乖<b>一起變小</b>：正在整理；連續幾天都這樣，才需要提高警覺。"
+      : sUp ? "短期乖乖變大、中期乖乖沒跟上：短線轉強，但中長期還沒跟上，要小心拉太開。"
+      : sDn ? "短期乖乖變小、中期乖乖持穩：多半是漲多後正常消化，不用急著擔心。"
+      : mUp ? "短期乖乖持平、中期乖乖變大：下面的支撐在跟上來。"
+      : mDn ? "短期乖乖持平、中期乖乖變小：中長期力道在收斂。"
+      : "短期、中期乖乖都和前一天一樣。";
+  }
+  // 乖乖動能：今天的變化和前一天的變化比
+  let mom = "資料天數不夠";
+  if (valid.length >= 3){
+    const d1 = last.s - prev.s, d0 = prev.s - valid[valid.length - 3].s, e = 0.05;
+    const sg = x => (x >= 0 ? "+" : "") + x.toFixed(1);
+    mom = `今天乖乖 ${sg(d1)}（前一天 ${sg(d0)}）：` + (
+      d1 > e && d0 <= e ? "<b>由縮轉增</b>，力道回來"
+      : d1 > e ? (d1 > d0 + e ? "<b>加速變大</b>" : "<b>還在變大，但速度變慢</b>")
+      : d1 < -e && d0 >= -e ? "<b>由增轉縮</b>，力道轉弱"
+      : d1 < -e ? (d1 < d0 - e ? "<b>縮得越來越快</b>" : "<b>還在縮，但速度變慢</b>")
+      : "<b>持平</b>");
+  }
+  const card = STAT
+    ? `這檔過去約 ${(STAT.days / 245).toFixed(1)} 年的資料（已做除權息還原）：乖乖平常最高大約到 <b>${STAT.S}</b>（只有 3% 的日子超過）；` +
+      `明顯波段 ${STAT.n} 次，波段乖乖高點中位數 ${STAT.M ?? '—'}、偏高時約 ${STAT.P75 ?? '—'}。` +
+      `<br>所以這檔的標準調整為：5香 <b>${TH.fl}–${TH.fh}</b>、警戒 <b>${TH.w}</b>、辣味 <b>${TH.h} 以上</b>（中期乖乖：5香 ${TH2.fl}–${TH2.fh}、警戒 ${TH2.w}、辣味 ${TH2.h} 以上）。` +
+      ''
+    : (MODE === 'auto'
+        ? '<b>這檔無個股股性參考資訊</b>（上市櫃時間較短，或過去明顯波段太少，算出來不可靠）。以下暫用作者原始標準：5香 4–7、警戒 9、辣味 11 以上。'
+        : '手動輸入的資料沒有個股股性參考，使用作者原始標準：5香 4–7、警戒 9、辣味 11 以上。');
+  // 白話解讀
+  const pl = [];
+  const s = last.s, sv = f(s, 1);
+  if (s < 0) pl.push(`乖乖是 <b>${sv}</b>（負的）：5日線已經跌到10日線下面。作者說這時這套看法<b>不適用</b>，走勢偏弱，先觀望。`);
+  else if (s < TH.fl) pl.push(`乖乖 <b>${sv}</b>，在這檔的<b>低檔區</b>（${TH.fl} 以下）：5日線和10日線貼很近，完全不熱。如果剛開始要漲，這是位置最好的時候；但要確認股價站在5日線上，而且乖乖不要一路掉到 0 以下。`);
+  else if (s <= TH.fh) pl.push(`乖乖 <b>${sv}</b>，在這檔的<b>5香區</b>（${TH.fl}～${TH.fh}）：作者最喜歡的甜蜜區，漲勢健康、不過熱，是比較舒服的介入或續抱區。`);
+  else if (s < TH.w) pl.push(`乖乖 <b>${sv}</b>，<b>偏熱</b>（${TH.fh}～${TH.w}）：開始熱了，不適合追，等它回落到5香區（${TH.fh} 以下）。`);
+  else if (s < TH.h) pl.push(`乖乖 <b>${sv}</b>，在<b>警戒區</b>（${TH.w}～${TH.h}）：漲得急，要小心，不建議這時進場。`);
+  else pl.push(`乖乖 <b>${sv}</b>，在<b>辣味區</b>（${TH.h} 以上）：短線過熱，<b>不要追</b>。作者的做法是等乖乖回落到5香區、而且下面三個條件都符合，再考慮。`);
+  if (valid.length >= 3 && s >= 0){
+    const d1 = s - prev.s, d0 = prev.s - valid[valid.length - 3].s;
+    if (d1 < -0.05){
+      pl.push(s > TH.fh ? '乖乖正在<b>回落</b>（降溫），這是作者要等的。' + (d1 > d0 ? '縮的速度變慢了。' : '')
+        : s < TH.fl ? '乖乖已經很低還在縮' + (d1 > d0 ? '，不過縮的力道變小，快縮不動了，這是好現象。' : '，而且越縮越快，要留意會不會掉到 0 以下。')
+        : '乖乖在5香區裡慢慢回落，屬於正常休息。');
+    } else if (d1 > 0.05){
+      pl.push(s > TH.fh ? '乖乖還在往上，<b>越來越熱</b>，不要追。' : '乖乖在<b>回升</b>，力道回來了。');
+    } else pl.push('乖乖和前一天差不多，持平。');
+  }
+  if (hasClose && last.m5 != null && prev && s >= 0){
+    const pc = cl.slice(Math.max(0, li - 3), li), lo = pc.length ? Math.min(...pc) : null;
+    const bad = [];
+    if (last.close < last.m5) bad.push(`收盤跌破5日線（${f(last.m5)} 元）`);
+    if (lo !== null && last.close < lo) bad.push(`跌破前3天最低收盤（${f(lo)} 元）`);
+    if (!bad.length && s < prev.s) pl.push(s > TH.fh ? `乖乖在降溫，股價也還沒走壞，但還沒回到5香區（${TH.fh} 以下），先等。` : '作者的三個條件都符合（綠色）：乖乖在回落，但股價沒有走壞，是<b>健康的休息</b>。');
+    else if (!bad.length) pl.push('股價沒有走壞：收盤站在5日線上，也沒跌破前3天低點。');
+    else pl.push(`要小心：${bad.join('、')}，股價開始轉弱，先等站回去再說。`);
+  }
+  const watch = [];
+  if (hasClose && cl.length >= 10 && last.m5 && last.m10){
+    const R = last.m5 / last.m10, s4 = cl.slice(-4).reduce((a,b)=>a+b,0), s9 = cl.slice(-9).reduce((a,b)=>a+b,0);
+    const x = (R * s9 - 2 * s4) / (2 - R), cp = last.close;
+    if (x > cp * 1.1) watch.push(`明天就算漲停，乖乖還是會變小（要收在約 ${f(x)} 元以上才會變大）。`);
+    else if (x < cp * 0.9) watch.push(`明天就算跌停，乖乖還是會變大（要收在約 ${f(x)} 元以下才會變小）。`);
+    else watch.push(`明天收盤<b>高於約 ${f(x)} 元</b>，乖乖會變大；低於這個價，乖乖會變小。`);
+  }
+  if (hasClose && last.m5 != null){
+    const g = (last.close / last.m5 - 1) * 100;
+    if (g > 3) watch.push(`今天收盤 ${f(last.close)} 元，比5日線高 ${g.toFixed(1)}%，股價跑得比均線快，短線有點拉開，不要急著追。`);
+    const lv = [['5日線', last.m5], ['10日線', last.m10]].concat(last.m20 != null ? [['20日線', last.m20]] : []);
+    const dn = lv.filter(v => v[1] <= last.close).sort((a, b) => b[1] - a[1]), upv = lv.filter(v => v[1] > last.close).sort((a, b) => a[1] - b[1]);
+    if (dn.length) watch.push('回檔先看' + dn.map(v => `${v[0]}約 <b>${f(v[1])} 元</b>`).join('，再來是') + '。');
+    if (upv.length) watch.push(`股價已經跌破${upv.map(v => v[0]).join('、')}，要先站回${upv[0][0]}約 <b>${f(upv[0][1])} 元</b>才算轉強。`);
+  }
+  if (s >= 0 && s < TH.fl) watch.push(`如果5日線跌到10日線（約 ${f(last.m10)} 元）下面，乖乖會變負數，這套看法就不適用了。`);
+  const plain = `<div style="margin-top:14px;padding:12px 14px;border-radius:12px;background:rgba(46,139,62,.08);line-height:1.85">` +
+    `<h3 style="margin:0 0 6px">白話解讀</h3>${pl.join('<br>')}` +
+    (watch.length ? `<div style="margin-top:8px"><b>接下來看這些價位：</b><br>${watch.map(w => '・' + w).join('<br>')}</div>` : '') +
+    `<div class="note" style="margin-top:8px">以上照作者方法解讀，只是參考，不是買賣建議。</div></div>`;
+  const row = (k, v) => `<tr><th>${k}</th><td>${v}</td></tr>`;
+  $('summary').innerHTML = `
+    <h2>${esc($('name').value || '這檔股票')}・${esc(last.date)}</h2>
+    <div class="big">
+      <div class="num" style="color:var(${z.c})">${f(last.s,1)}</div>
+      <div><span class="badge" style="background:var(${z.c})">${z.t}</span><br>
+      <span class="note">短期乖乖（5日線 ÷ 10日線）・${STAT ? '依這檔股性的標準' : (MODE === 'auto' ? '無個股參考資訊，用作者原始標準' : '作者原始標準')}</span></div>
+    </div>
+    ${plain}
+    <div class="scroll" style="margin-top:12px"><table class="flow">
+      ${row('5日線', f(last.m5))}
+      ${row('短期乖乖', `${f(last.s,1)}　${z.t}`)}
+      ${row('10日線', f(last.m10))}
+      ${row('中期乖乖', last.m == null ? '需要20日線' : `${f(last.m,1)}　${zone(last.m, TH2).t}`)}
+      ${row('20日線', f(last.m20))}
+      ${row('短中期一起看', dual)}
+      ${row('平均變化', `近幾天平均每天 ${avgTxt}` + (down ? `，已連續縮減 ${down} 天` : ''))}
+      ${row('乖乖動能', mom)}
+      ${row('預測', pred + (eta ? '<br>' + eta : ''))}
+      ${row('支撐／介入區', sup + chk)}
+      ${row('延伸分析', ext + '<br>' + card)}
+    </table></div>`;
+}
+
+function chart(v){
+  const W = Math.max(520, v.length * 46), H = 240, L = 36, R = 12, T = 12, B = 30;
+  const vals = v.map(r => r.s).concat(v.map(r => r.m).filter(x => x != null));
+  let lo = Math.min(0, ...vals) - 1, hi = Math.max(TH.h + 2, ...vals) + 1;
+  const x = i => L + (v.length === 1 ? (W - L - R) / 2 : i * (W - L - R) / (v.length - 1));
+  const y = val => T + (hi - val) / (hi - lo) * (H - T - B);
+  const band = (a, b, c) => { const y1 = y(Math.min(b, hi)), y2 = y(Math.max(a, lo)); return y2 > y1 ? `<rect x="${L}" y="${y1}" width="${W-L-R}" height="${y2-y1}" fill="${css(c)}" opacity=".16"/>` : ''; };
+  let s = `<svg viewBox="0 0 ${W} ${H}" width="${W}" role="img" aria-label="乖乖走勢圖">`;
+  s += band(0,TH.fl,'--cold') + band(TH.fl,TH.fh,'--five') + band(TH.fh,TH.w,'--mid') + band(TH.w,TH.h,'--warn') + band(TH.h,hi,'--hot');
+  [0,TH.fl,TH.fh,TH.w,TH.h].forEach(t => { if (t > lo && t < hi) s += `<text x="${L-6}" y="${y(t)+4}" font-size="11" text-anchor="end" fill="${css('--sub')}">${t}</text><line x1="${L}" x2="${W-R}" y1="${y(t)}" y2="${y(t)}" stroke="${css('--line')}"/>`; });
+  const path = key => { let d = '', on = false; v.forEach((r, i) => { if (r[key] == null){ on = false; return; } d += (on ? 'L' : 'M') + x(i) + ' ' + y(r[key]); on = true; }); return d; };
+  s += `<path d="${path('m')}" fill="none" stroke="${css('--sub')}" stroke-width="2" stroke-dasharray="5 4"/>`;
+  s += `<path d="${path('s')}" fill="none" stroke="${css('--ink')}" stroke-width="2.5"/>`;
+  v.forEach((r, i) => {
+    s += `<circle cx="${x(i)}" cy="${y(r.s)}" r="5" fill="${css(zone(r.s).c)}" stroke="${css('--panel')}" stroke-width="2"/>`;
+    s += `<text x="${x(i)}" y="${y(r.s)-10}" font-size="11" text-anchor="middle" fill="${css('--ink')}">${f(r.s,1)}</text>`;
+    s += `<text x="${x(i)}" y="${H-10}" font-size="11" text-anchor="middle" fill="${css('--sub')}">${esc(r.date)}</text>`;
+  });
+  s += '</svg><p class="note">實線＝短期乖乖（圓點顏色＝所在區間）；虛線＝中期乖乖（有20日線才會出現）</p>';
+  $('chart').innerHTML = s;
+}
+
+function table(rows){
+  let h = '<tr><th>日期</th><th>收盤</th><th>5日線</th><th>10日線</th><th>20日線</th><th>短期乖乖</th><th>中期乖乖</th><th>變化</th></tr>';
+  let prev = null;
+  rows.forEach(r => {
+    const d = (prev != null && r.s != null) ? r.s - prev : null;
+    h += `<tr><td>${esc(r.date)}</td><td>${f(r.close)}</td><td>${f(r.m5)}</td><td>${f(r.m10)}</td><td>${f(r.m20)}</td>
+      <td><i class="dot" style="background:var(${zone(r.s).c})"></i>${f(r.s,1)}</td><td>${f(r.m,1)}</td>
+      <td>${d == null ? '—' : (d > 0 ? '▲' : d < 0 ? '▼' : '') + Math.abs(d).toFixed(1)}</td></tr>`;
+    if (r.s != null) prev = r.s;
+  });
+  $('tbl').innerHTML = h;
+}
+function esc(s){ return String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+
+// ===== 向本機程式要資料（由程式去證交所／櫃買中心抓） =====
+async function auto(){
+  let code = $('code').value.trim().toUpperCase();
+  $('err').hidden = true; $('pick').innerHTML = '';
+  const fail = m => { $('err').textContent = m; $('err').hidden = false; $('out').hidden = true; $('autoMsg').textContent = ''; };
+  if (!code) return fail('請輸入股票代號或名稱。');
+  // 輸入的是名稱：先查代號
+  if (!/^[0-9A-Z]{4,6}$/.test(code)){
+    $('autoMsg').textContent = '查詢名稱中…';
+    const list = await new Promise((ok, bad) => google.script.run.withSuccessHandler(ok).withFailureHandler(bad).findStock(code)).catch(() => null);
+    if (!list) return fail('名稱查詢失敗，請改輸入代號。');
+    if (!list.length) return fail(`找不到「${$('code').value.trim()}」，請確認名稱或改輸入代號。`);
+    if (list.length > 1){
+      $('autoMsg').textContent = '找到好幾檔，請點選：';
+      $('pick').innerHTML = list.map(s => `<button class="ghost" data-c="${s[0]}">${esc(s[1])} ${s[0]}</button>`).join('');
+      $('pick').querySelectorAll('button').forEach(b => b.onclick = () => { $('code').value = b.dataset.c; auto(); });
+      return;
+    }
+    code = list[0][0];
+  }
+  $('autoMsg').textContent = '抓取中…';
+  $('auto').disabled = true;
+  try {
+    const r = await new Promise((ok, bad) =>
+      google.script.run.withSuccessHandler(ok).withFailureHandler(bad).getData(code));
+    if (r.error) return fail(r.error);
+    STAT = r.stat || null; MODE = 'auto';
+    TH = mkTH(STAT ? STAT.S / 8.2 : 1); TH2 = mkTH(STAT && STAT.S2 ? STAT.S2 / 11.46 : 1);
+    const rows = r.rows.map(x => ({date: x.date, close: x.close, m5:null, m10:null, m20:null}));
+    $('name').value = (r.name ? r.name + ' ' : '') + code;
+    $('autoMsg').textContent = `${r.market}・已抓到最近 ${rows.length} 個交易日，最新收盤日 ${r.last}。` + (r.adjNote || '');
+    const all = compute(rows);
+    if (!all.some(x => x.s != null)) return fail('這檔交易日數不足 10 天，算不出乖乖。');
+    render(all.slice(-30));
+  } catch(e){ fail('抓取失敗：' + (e && e.message ? e.message : e)); }
+  finally { $('auto').disabled = false; }
+}
+$('auto').onclick = auto;
+$('code').onkeydown = e => { if (e.key === 'Enter') auto(); };
+// 邊打字邊列出符合的股票名稱
+let sugT = 0;
+$('code').oninput = () => {
+  clearTimeout(sugT);
+  const q = $('code').value.trim();
+  if (!q || /^[0-9A-Za-z]+$/.test(q)) { $('pick').innerHTML = ''; return; }
+  sugT = setTimeout(() => {
+    google.script.run.withSuccessHandler(list => {
+      if (q !== $('code').value.trim()) return;
+      $('pick').innerHTML = (list || []).map(s => `<button class="ghost" data-c="${s[0]}">${esc(s[1])} ${s[0]}</button>`).join('');
+      $('pick').querySelectorAll('button').forEach(b => b.onclick = () => { $('code').value = b.dataset.c; $('pick').innerHTML = ''; auto(); });
+    }).findStock(q, true);
+  }, 350);
+};
+
+</script>
+</body>
+</html>
