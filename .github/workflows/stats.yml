@@ -1,16 +1,20 @@
-name: 每日更新收盤資料
+name: 每季重算股性
 on:
   schedule:
-    - cron: '40 7 * * 1-5'
-    - cron: '40 9 * * 1-5'
+    - cron: '30 11 5 1,4,7,10 *'
   workflow_dispatch:
+    inputs:
+      check:
+        description: '只比對 2026/10/1 版（不更新）'
+        type: boolean
+        default: false
 permissions:
   contents: write
 concurrency:
   group: data
   cancel-in-progress: false
 jobs:
-  update:
+  stats:
     runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:
@@ -18,14 +22,16 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - run: python -u update.py
-      - run: python -u backfill.py
-        env:
-          BUDGET_MIN: '20'
-      - run: |
+      - run: pip install numpy pandas
+      - if: ${{ inputs.check }}
+        run: python -u stats.py --check 20261001
+      - if: ${{ !inputs.check }}
+        run: python -u stats.py
+      - if: ${{ !inputs.check }}
+        run: |
           git config user.name "kk-ma-tool-bot"
           git config user.email "kk-ma-tool-bot@users.noreply.github.com"
           git add data
           git diff --cached --quiet && exit 0
-          git commit -m "更新收盤資料"
+          git commit -m "每季重算股性"
           for i in 1 2 3; do git pull --rebase && git push && exit 0; sleep 10; done; exit 1
