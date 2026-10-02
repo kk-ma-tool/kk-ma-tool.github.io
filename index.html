@@ -405,6 +405,64 @@ function summary(rows, valid){
     `<h3 style="margin:0 0 6px">白話解讀</h3>${pl.join('<br>')}` +
     (watch.length ? `<div style="margin-top:8px"><b>接下來看這些價位：</b><br>${watch.map(w => '・' + w).join('<br>')}</div>` : '') +
     `<div class="note" style="margin-top:8px">以上照作者方法解讀，只是參考，不是買賣建議。</div></div>`;
+  // ===== 依作者「完整核對版」規格新增：原始比值、啟動觀察、三層回落區、5日延伸、結構失效條件 =====
+  const rr = (a, b) => (a != null && b) ? (a / b).toFixed(3) : '—';
+  const vr = rows.slice(0, li + 1);
+  const chg = key => { const a = []; for (let i = 1; i < vr.length; i++) if (vr[i][key] != null && vr[i - 1][key] != null) a.push(vr[i][key] - vr[i - 1][key]); return a; };
+  const avgOf = a => a.length ? a.reduce((x, y) => x + y, 0) / a.length : null;
+  let c5 = chg('m5'), c10 = chg('m10'); const c20 = chg('m20');
+  if (c20.length) { c5 = c5.slice(-c20.length); c10 = c10.slice(-c20.length); }   // 三條線用同一段期間的平均
+  const a5 = avgOf(c5), a10 = avgOf(c10), a20 = avgOf(c20);
+  const winTxt = `（依最近 ${c10.length} 個交易日的平均每天變化推估，不代表一定會到）`;
+  const stageOf = r => r < 1 ? '5日線在10日線下面' : r < 1.025 ? '潛伏期' : r < 1.05 ? '主升啟動帶' : r < 1.08 ? '主升延伸帶' : '高乖離區';
+  let kick = '需要10日線', zones = '需要20日線', ext5 = '需要20日線', fail = '需要20日線';
+  if (a5 != null && a10 != null && last.m5 && last.m10){
+    const p5 = last.m5 + a5, p10 = last.m10 + a10, r0 = last.m5 / last.m10, r1 = p5 / p10;
+    const st0 = stageOf(r0), st1 = stageOf(r1);
+    kick = `現在 ${f(last.s, 1)}（原始比值 ${rr(last.m5, last.m10)}，${st0}）→ 預估明天 <b>${f(kk(p5, p10), 1)}</b>（原始比值 ${r1.toFixed(3)}，${st1}）。` +
+      (st0 === '潛伏期' && st1 === '主升啟動帶' ? '<b>由潛伏期往主升啟動帶移動</b>，是作者說的啟動觀察訊號。'
+        : st0 === st1 ? `預估還停在${st1}。` : `預估由${st0}移到${st1}。`) + winTxt;
+  }
+  if (a10 != null && a20 != null && last.m10 && last.m20){
+    const P10 = d => last.m10 + a10 * d, P20 = d => last.m20 + a20 * d;
+    const band = d => `${f(Math.min(P10(d), P20(d)))}～${f(Math.max(P10(d), P20(d)))}`;
+    zones = `第一回落區（強勢回測，預估10日線附近）：明天約 <b>${f(P10(1))} 元</b>` +
+      `<br>第二回落區（深度回測，10日線～20日線之間）：明天約 <b>${band(1)} 元</b>` +
+      `<br>結構防守區（預估20日線附近）：明天約 <b>${f(P20(1))} 元</b>，到這裡要同時看中期乖乖是否還穩` +
+      `<br>未來3天支撐測試區（20日線～10日線）：${[1, 2, 3].map(d => `第${d}天 ${band(d)}`).join('、')} 元` +
+      `<br>${winTxt}回落區只是推估的測試區，不代表價格一定會到，也不代表到了一定會反彈。`;
+    const g0 = last.m10 - last.m20, g5 = P10(5) - P20(5);
+    const cross = Math.sign(g0) !== Math.sign(g5) && g0 !== 0;
+    ext5 = `5天後：10日線約 <b>${f(P10(5))}</b>、20日線約 <b>${f(P20(5))}</b> 元。` +
+      `兩線距離${Math.abs(g5) < Math.abs(g0) ? '<b>收斂</b>' : '<b>擴大</b>'}（現在差 ${f(g0)}，5天後差 ${f(g5)}）` +
+      (cross ? '，<b>預估會交會</b>' : '') + '；' +
+      (a10 > 0 && a20 > 0 ? '10日線、20日線<b>同步上揚</b>，支撐區持續上移' : a10 < 0 && a20 < 0 ? '10日線、20日線<b>同步下彎</b>，支撐區往下移' : '10日線、20日線方向不一致') +
+      `；中期乖乖預估 ${f(kk(P10(5), P20(5)), 1)}（現在 ${last.m == null ? '—' : f(last.m, 1)}）。`;
+    const cl2 = vr.map(r => r.close), n = vr.length;
+    const lastC = id => n - 1 - id >= 0 ? vr[n - 1 - id] : null;
+    const L1 = lastC(1);
+    const d10 = c10.length ? c10[c10.length - 1] : null, d20 = c20.length ? c20[c20.length - 1] : null;
+    const weak = (d, a) => d != null && (d < 0 || (a > 0 && d < a * 0.5));
+    const hasC = last.close != null && L1 && L1.close != null;
+    const C = [
+      ['短期乖乖持續下降', down >= 2],
+      ['中期乖乖同步下降', prev && last.m != null && prev.m != null && last.m < prev.m],
+      ['10日線上升速度明顯變慢或轉跌', weak(d10, a10)],
+      ['20日線上升速度明顯變慢或轉跌', weak(d20, a20)],
+      ['收盤跌進10日線以下後站不回來（連續2天在10日線下）', hasC && last.close < last.m10 && L1.m10 != null && L1.close < L1.m10],
+      ['收盤跌破20日線，同時中期乖乖變差', last.close != null && last.close < last.m20 && prev && prev.m != null && last.m < prev.m]
+    ];
+    const hit = C.filter(c => c[1]);
+    const lv = hit.length >= 4 ? '<b>警戒高</b>' : hit.length >= 2 ? '<b>要注意</b>' : '警戒低';
+    const near20 = last.close != null && last.close <= last.m20 * 1.02;
+    const both = prev && prev.m != null && last.s < prev.s && last.m < prev.m;
+    const dead = near20 && both && weak(d20, a20);
+    fail = `作者的6個轉弱條件，符合 <b>${hit.length}／6</b> 項（${lv}）` +
+      (hit.length ? '：' + hit.map(c => c[0]).join('、') : '') +
+      '<br>' + (dead ? '<b>已達結構失效</b>：收盤在20日線附近或以下、短中期乖乖同步變差、20日線轉弱，三個同時成立。'
+        : `還沒達到結構失效（要同時符合：收盤在20日線附近或以下${near20 ? '✔' : '✘'}、短中期乖乖同步變差${both ? '✔' : '✘'}、20日線轉弱${weak(d20, a20) ? '✔' : '✘'}）。`) +
+      (prev && last.s < prev.s && !(last.m < prev.m) ? '<br>短期乖乖回收但中期乖乖穩定，作者說這屬於動能消化，不算結構失效。' : '');
+  }
   const row = (k, v) => `<tr><th>${k}</th><td>${v}</td></tr>`;
   $('summary').innerHTML = `
     <h2>${esc($('name').value || '這檔股票')}・${esc(last.date)}</h2>
@@ -416,16 +474,20 @@ function summary(rows, valid){
     ${plain}
     <div class="scroll" style="margin-top:12px"><table class="flow">
       ${row('5日線', f(last.m5))}
-      ${row('短期乖乖', `${f(last.s,1)}　${z.t}`)}
+      ${row('短期乖乖', `${f(last.s,1)}（原始比值 ${rr(last.m5, last.m10)}）　${z.t}`)}
       ${row('10日線', f(last.m10))}
-      ${row('中期乖乖', last.m == null ? '需要20日線' : `${f(last.m,1)}　${zone(last.m, TH2).t}`)}
+      ${row('中期乖乖', last.m == null ? '需要20日線' : `${f(last.m,1)}（原始比值 ${rr(last.m10, last.m20)}）　${zone(last.m, TH2).t}`)}
       ${row('20日線', f(last.m20))}
       ${row('短中期一起看', dual)}
-      ${row('平均變化', `近幾天平均每天 ${avgTxt}` + (down ? `，已連續縮減 ${down} 天` : ''))}
+      ${row('平均變化', `近${ch.length}天平均每天 ${avgTxt}` + (down ? `，已連續縮減 ${down} 天` : ''))}
       ${row('乖乖動能', mom)}
       ${row('預測', pred + (eta ? '<br>' + eta : ''))}
       ${row('支撐／介入區', sup + chk)}
       ${row('延伸分析', ext + '<br>' + card)}
+      ${row('啟動觀察', kick)}
+      ${row('均線5日延伸', ext5)}
+      ${row('回落區（作者分層）', zones)}
+      ${row('結構警戒／失效', fail)}
     </table></div>`;
 }
 
