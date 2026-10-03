@@ -308,10 +308,11 @@ function summary(rows, valid){
   } else if (last.s >= 0) eta = `已經在這檔的5香區上緣（${TH.fh}）以下。`;
   // 支撐／介入區
   let sup = `5日線約 <b>${f(last.m5)}</b> 元、10日線約 <b>${f(last.m10)}</b> 元。`;
-  if (hasClose && STAT && STAT.dd != null){
+  // 只在辣味區、或警戒區後段（接近辣味）才顯示這檔過去的回檔統計
+  if (hasClose && STAT && STAT.dd != null && last.s >= TH.w + (TH.h - TH.w) * 2 / 3){
     const H = Math.max(...cl.slice(-10)), W = H * (1 + STAT.dd / 100);
-    sup += `<br>近10天最高收盤 ${f(H)} 元；這檔乖乖到高點後，10天內通常回檔約 ${Math.abs(STAT.dd).toFixed(1)}%，換算約 <b>${f(W)}</b> 元。` +
-           (STAT.b10 != null ? `過去約 ${STAT.b10}% 的情況會跌回10日線附近。` : '');
+    sup += `<br>乖乖已${last.s >= TH.h ? '進入' : '接近'}辣味區。這檔過去乖乖衝到波段高點後，接下來10天內最深通常跌到高點下方約 ${Math.abs(STAT.dd).toFixed(1)}%（中間值；以近10天最高收盤 ${f(H)} 元換算約 <b>${f(W)}</b> 元），之後不一定繼續跌` +
+           (STAT.b10 != null ? `；過去約 ${STAT.b10}% 的波段，在這10天內曾碰到10日線` : '') + '。這是過去統計，不是預測。';
   }
   // 收盤離各均線多少 %
   if (hasClose && last.m20 != null){
