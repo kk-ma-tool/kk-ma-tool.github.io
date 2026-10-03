@@ -125,8 +125,10 @@ table.mini th,table.mini td{padding:4px 10px}
         .catch(function () { return fetch('data/hist/ex.json', {cache: 'no-cache'}).then(function (r) { return r.json(); }); }).catch(function () { return {}; }),
       fetch('data/hist/cap.json', {cache: 'no-cache'}).then(function (r) { return r.json(); }).catch(function () { return {}; }),
       fetch('data/stats_meta.json', {cache: 'no-cache'}).then(function (r) { return r.json(); }).catch(function () { return null; }),
-      fetch('data/idx.json', {cache: 'no-cache'}).then(function (r) { return r.json(); }).catch(function () { return null; })
+      fetch('data/idx.json', {cache: 'no-cache'}).then(function (r) { return r.json(); }).catch(function () { return null; }),
+      fetch('data/holidays.json', {cache: 'no-cache'}).then(function (r) { return r.json(); }).catch(function () { return null; })
     ]).then(function (a) {
+      window.HOL = new Set((a[7] && a[7].closed) || []);   // 證交所公告的休市日
       IDX = a[6] && a[6].d && a[6].d.length ? a[6] : null;
       PX = a[0]; ST = a[1]; EX = a[3] || {}; CAP = a[4] || {}; META = a[5];
       // 除權息以官方資料為主；官方沒有的日子，才用每日程式算出的比例（空白的不用）
@@ -314,6 +316,8 @@ function tmode(){
   const lastD = window.RAW && window.RAW.length ? window.RAW[window.RAW.length - 1].date : '';
   if (lastD === today) return {k: '下個交易日試算', row: '下個交易日', when: '下個交易日的收盤價', st: '今天的收盤資料已經更新'};
   if (wd === 0 || wd === 6) return {k: '下個交易日試算', row: '下個交易日', when: '下個交易日的收盤價', st: '週末休市'};
+  const ymd = t.getUTCFullYear() * 10000 + (t.getUTCMonth() + 1) * 100 + t.getUTCDate();
+  if (window.HOL && window.HOL.has(ymd)) return {k: '下個交易日試算', row: '下個交易日', when: '下個交易日的收盤價', st: '今天休市（國定假日）'};
   if (hm < 900) return {k: '開盤前試算', row: today + '試算', when: '今天的收盤價', st: '現在還沒開盤'};
   if (hm <= 1330) return {k: '盤中試算', row: '盤中', when: '現在就收盤的價格', st: '現在是盤中'};
   return {k: '收盤試算', row: today + '試算', when: '今天的收盤價', st: '已經收盤，正式資料下午 3:40 後才會更新'};
@@ -569,7 +573,7 @@ function summary(rows, valid){
   $('summary').innerHTML = `
     <h2>${esc($('name').value || '這檔股票')}・${esc(last.date)}</h2>
     <div class="row" style="align-items:center;margin-top:0"><span class="note">${(tm => tm.k + "・" + tm.st + "：輸入價格")(tmode())}</span><input id="ip" type="number" step="any" inputmode="decimal" style="width:8em;padding:6px 8px"><button id="ipb" class="ghost zbtn">試算</button></div>
-    <p class="note" style="margin:2px 0 8px">說明：輸入一個價格，網頁會把它當成${tmode().when}，用同一套算法重算乖乖、均線、回落區和白話解讀，可以先看「如果收在這個價會怎樣」。盤中（9:00–13:30）是試算今天；收盤資料更新後或週末，是試算下個交易日。國定假日網頁無法判斷，請自行留意。</p>
+    <p class="note" style="margin:2px 0 8px">說明：輸入一個價格，網頁會把它當成${tmode().when}，用同一套算法重算乖乖、均線、回落區和白話解讀，可以先看「如果收在這個價會怎樣」。盤中（9:00–13:30）是試算今天；收盤資料更新後、週末或國定假日，是試算下個交易日。國定假日依證交所公告自動判斷；颱風等臨時休市無法判斷，請自行留意。</p>
     <div class="big">
       <div class="num" style="color:var(${z.c})">${f(last.s,1)}</div>
       <div><span class="badge" style="background:var(${z.c})">${z.t}</span><br>

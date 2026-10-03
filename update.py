@@ -102,6 +102,23 @@ def twt48u(store):
         lst = [e for e in store.get(code, []) if e[0] != k] + [[k, v(iC), v(iS), v(iR), v(iP)]]
         store[code] = sorted(lst)[-6:]
 
+def holidays(store):
+    """證交所公告的休市日（網頁判斷今天是否開市用）：抓今年和明年，「開始交易日／最後交易日」是有交易的日子，不算休市"""
+    y = dt.datetime.now(TW).year
+    closed = set(store.get('closed', []))
+    for yy in (y, y + 1):
+        try:
+            j = get(f'https://www.twse.com.tw/rwd/zh/holidaySchedule/holidaySchedule?date={yy}0101&response=json')
+        except Exception as e:
+            print('休市日 fail', yy, e); continue
+        for r in j.get('data') or []:
+            g = re.findall(r'\d+', str(r[0])); name = str(r[1])
+            if len(g) < 3 or '開始交易' in name or '最後交易' in name:
+                continue
+            yv = int(g[0]); yv += 1911 if yv < 1911 else 0
+            closed.add(yv * 10000 + int(g[1]) * 100 + int(g[2]))
+    store['closed'] = sorted(closed)
+
 def taiex(store):
     """加權指數每日收盤（網頁顯示大盤乖乖用）：第一次抓最近 6 個月，之後每次抓本月和上個月，保留最近 KEEP 天"""
     today = dt.datetime.now(TW).date()
@@ -224,6 +241,7 @@ def main():
             del ex[c]
     save('px.json', px); save('ex.json', ex); save('tw48.json', t48)
     idx = load('idx.json', {'d': [], 'c': []}); taiex(idx); save('idx.json', idx)
+    hol = load('holidays.json', {'closed': []}); holidays(hol); save('holidays.json', hol)
     print('完成：', len(px['d']), '個交易日，', len(px['c']), '檔，最後一天', px['d'][-1] if px['d'] else '-')
 
 if __name__ == '__main__':
