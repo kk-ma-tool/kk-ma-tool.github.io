@@ -102,6 +102,27 @@ def twt48u(store):
         lst = [e for e in store.get(code, []) if e[0] != k] + [[k, v(iC), v(iS), v(iR), v(iP)]]
         store[code] = sorted(lst)[-6:]
 
+def taiex(store):
+    """加權指數每日收盤（網頁顯示大盤乖乖用）：第一次抓最近 6 個月，之後每次抓本月和上個月，保留最近 KEEP 天"""
+    today = dt.datetime.now(TW).date()
+    have = dict(zip(store.get('d', []), store.get('c', [])))
+    for k in range(5 if not have else 1, -1, -1):
+        y, m = today.year, today.month - k
+        while m <= 0:
+            m += 12; y -= 1
+        try:
+            j = get(f'https://www.twse.com.tw/rwd/zh/TAIEX/MI_5MINS_HIST?date={y}{m:02d}01&response=json')
+        except Exception as e:
+            print('TAIEX fail', e); continue
+        fl = [str(x) for x in (j.get('fields') or [])]
+        ic = next((i for i, x in enumerate(fl) if '收盤' in x), 4)
+        for r in j.get('data') or []:
+            g = re.findall(r'\d+', str(r[0])); v = num(r[ic])
+            if len(g) >= 3 and v:
+                have[(int(g[0]) + 1911) * 10000 + int(g[1]) * 100 + int(g[2])] = v
+    d = sorted(have)[-KEEP:]
+    store['d'] = d; store['c'] = [have[k] for k in d]
+
 def load(name, default):
     p = os.path.join(D, name)
     return json.load(open(p, encoding='utf-8')) if os.path.exists(p) else default
@@ -202,6 +223,7 @@ def main():
         if not ex[c]:
             del ex[c]
     save('px.json', px); save('ex.json', ex); save('tw48.json', t48)
+    idx = load('idx.json', {'d': [], 'c': []}); taiex(idx); save('idx.json', idx)
     print('完成：', len(px['d']), '個交易日，', len(px['c']), '檔，最後一天', px['d'][-1] if px['d'] else '-')
 
 if __name__ == '__main__':
