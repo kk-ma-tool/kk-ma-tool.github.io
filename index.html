@@ -70,9 +70,9 @@ table.mini th,table.mini td{padding:4px 10px}
 .phead h2{margin:0}
 .zbtn{padding:4px 16px}
 .pcwrap{display:flex;gap:14px;align-items:flex-start}
-.pclg{flex:0 0 180px;flex-direction:column;flex-wrap:nowrap;margin-top:0;font-size:.9rem;color:var(--ink)}
+.pclg{flex:0 0 150px;flex-direction:column;flex-wrap:nowrap;gap:4px;margin-top:0;font-size:.8rem;line-height:1.4;color:var(--ink)}
 #pchart{flex:1;min-width:0}
-#chart svg,#pchart svg{max-width:none}
+#chart svg,#pchart svg{width:100%;height:auto}
 @media (max-width:700px){.pcwrap{flex-direction:column}.pclg{flex-direction:row;flex-wrap:wrap;flex-basis:auto}}
 </style>
 </head>
@@ -607,13 +607,13 @@ function summary(rows, valid){
 }
 
 function chart(v){
-  const W = Math.max(520, v.length * 48), H = 280, L = 40, R = 12, T = 12, B = 30;
+  const W = Math.max(520, v.length * 30), H = 280, L = 40, R = 12, T = 12, B = 30;
   const vals = v.map(r => r.s).concat(v.map(r => r.m).filter(x => x != null));
   let lo = Math.min(0, ...vals) - 1, hi = Math.max(TH.h + 2, ...vals) + 1;
   const x = i => L + (v.length === 1 ? (W - L - R) / 2 : i * (W - L - R) / (v.length - 1));
   const y = val => T + (hi - val) / (hi - lo) * (H - T - B);
   const band = (a, b, c) => { const y1 = y(Math.min(b, hi)), y2 = y(Math.max(a, lo)); return y2 > y1 ? `<rect x="${L}" y="${y1}" width="${W-L-R}" height="${y2-y1}" fill="${css(c)}" opacity=".16"/>` : ''; };
-  let s = `<svg viewBox="0 0 ${W} ${H}" width="${W}" style="max-width:none" role="img" aria-label="乖乖走勢圖">`;
+  let s = `<svg viewBox="0 0 ${W} ${H}" width="${W}" role="img" aria-label="乖乖走勢圖">`;
   s += band(0,TH.l,'--cold') + band(TH.l,TH.fh,'--five') + band(TH.fh,TH.w,'--mid') + band(TH.w,TH.h,'--warn') + band(TH.h,hi,'--hot');
   [0,TH.l,TH.fl,TH.fh,TH.w,TH.h].forEach(t => { if (t > lo && t < hi) s += `<text x="${L-6}" y="${y(t)+4}" font-size="13" text-anchor="end" fill="${css('--sub')}">${t}</text><line x1="${L}" x2="${W-R}" y1="${y(t)}" y2="${y(t)}" stroke="${css('--line')}"/>`; });
   const path = key => { let d = '', on = false; v.forEach((r, i) => { if (r[key] == null){ on = false; return; } d += (on ? 'L' : 'M') + x(i) + ' ' + y(r[key]); on = true; }); return d; };
@@ -622,9 +622,9 @@ function chart(v){
   v.forEach((r, i) => {
     s += `<circle cx="${x(i)}" cy="${y(r.s)}" r="5" fill="${css(zone(r.s).c)}" stroke="${css('--panel')}" stroke-width="2"/>`;
     s += `<text x="${x(i)}" y="${y(r.s)-10}" font-size="13" text-anchor="middle" fill="${css('--ink')}">${f(r.s,1)}</text>`;
-    s += `<text x="${x(i)}" y="${H-10}" font-size="13" text-anchor="middle" fill="${css('--sub')}">${esc(r.date)}</text>`;
+    if (i % 3 === (v.length - 1) % 3) s += `<text x="${x(i)}" y="${H-10}" font-size="13" text-anchor="middle" fill="${css('--sub')}">${esc(r.date)}</text>`;
   });
-  s += '</svg><p class="note">實線＝短期乖乖（圓點顏色＝所在區間）；虛線＝中期乖乖（有20日線才會出現）。圖可以左右滑動，最新的在最右邊。</p>';
+  s += '</svg><p class="note">實線＝短期乖乖（圓點顏色＝所在區間）；虛線＝中期乖乖（有20日線才會出現）。按「放大看」可以看大圖。</p>';
   $('chart').innerHTML = s;
   $('chart').scrollLeft = $('chart').scrollWidth;
   $('kzoom').onclick = () => zoomSvg('chart');
@@ -642,7 +642,7 @@ function priceChart(rows){
   const v = rows.filter(r => r.close != null);
   if (v.length < 2){ $('pchart').innerHTML = ''; return; }
   const F = window.FUT, nF = F ? 3 : 0, n = v.length;
-  const L = 60, R = 130, T = 26, B = 36, step = 36, W = L + (n - 1 + nF) * step + R, H = 340;
+  const L = 52, R = 112, T = 26, B = 36, step = 18, W = L + (n - 1 + nF) * step + R, H = 340;
   const C = {c: css('--ink') || '#222', m5: '#E07B24', m10: '#3D7FB0', m20: '#5E8F2A', z: '#C8312B'};
   const all = [];
   v.forEach(r => [r.close, r.m5, r.m10, r.m20].forEach(x => x != null && all.push(x)));
@@ -651,8 +651,8 @@ function priceChart(rows){
   const x = i => L + i * step, y = val => T + (hi - val) / (hi - lo) * (H - T - B);
   const line = (key, col, w) => { let d = '', on = false; v.forEach((r, i) => { if (r[key] == null){ on = false; return; } d += (on ? 'L' : 'M') + x(i) + ' ' + y(r[key]); on = true; });
     return `<path d="${d}" fill="none" stroke="${col}" stroke-width="${w}"/>`; };
-  let s = `<svg viewBox="0 0 ${W} ${H}" width="${W}" style="max-width:none" role="img" aria-label="收盤與均線圖">`;
-  for (let k = 0; k <= 4; k++){ const val = lo + (hi - lo) * k / 4; s += `<line x1="${L}" x2="${W - R}" y1="${y(val)}" y2="${y(val)}" stroke="${css('--line')}"/><text x="${L - 6}" y="${y(val) + 5}" font-size="13" text-anchor="end" fill="${css('--sub')}">${f(val, val < 100 ? 2 : 0)}</text>`; }
+  let s = `<svg viewBox="0 0 ${W} ${H}" width="${W}" role="img" aria-label="收盤與均線圖">`;
+  for (let k = 0; k <= 4; k++){ const val = lo + (hi - lo) * k / 4; s += `<line x1="${L}" x2="${W - R}" y1="${y(val)}" y2="${y(val)}" stroke="${css('--line')}"/><text x="${L - 6}" y="${y(val) + 5}" font-size="15" text-anchor="end" fill="${css('--sub')}">${f(val, val < 100 ? 2 : 0)}</text>`; }
   // 10日線～20日線回測支撐帶
   let top = '', bot = '';
   v.forEach((r, i) => { if (r.m10 != null && r.m20 != null){ top += `${x(i)},${y(Math.max(r.m10, r.m20))} `; bot = `${x(i)},${y(Math.min(r.m10, r.m20))} ` + bot; } });
@@ -663,9 +663,9 @@ function priceChart(rows){
     for (let d = 0; d < 3; d++){ t2 += `${x(n + d)},${y(Math.max(F.P10[d], F.P20[d]))} `; b2 = `${x(n + d)},${y(Math.min(F.P10[d], F.P20[d]))} ` + b2; }
     s += `<polygon points="${t2}${b2}" fill="${C.z}" opacity=".14"/>`;
     s += `<line x1="${x(n - 1) + step / 2}" x2="${x(n - 1) + step / 2}" y1="${T}" y2="${H - B}" stroke="${css('--sub')}" stroke-dasharray="3 3"/>`;
-    s += `<circle cx="${x(n)}" cy="${y(F.P10[0])}" r="5" fill="${C.m10}"/><text x="${x(n + 2) + 8}" y="${y(F.P10[0]) - 4}" font-size="13" fill="${C.m10}">第一回落區</text><text x="${x(n + 2) + 8}" y="${y(F.P10[0]) + 12}" font-size="13" font-weight="700" fill="${C.m10}">${f(F.P10[0])}</text>`;
-    s += `<circle cx="${x(n)}" cy="${y(F.P20[0])}" r="5" fill="${C.m20}"/><text x="${x(n + 2) + 8}" y="${y(F.P20[0]) + 18}" font-size="13" fill="${C.m20}">結構防守</text><text x="${x(n + 2) + 8}" y="${y(F.P20[0]) + 34}" font-size="13" font-weight="700" fill="${C.m20}">${f(F.P20[0])}</text>`;
-    s += `<text x="${x(n + 1)}" y="${H - 12}" font-size="13" text-anchor="middle" fill="${css('--sub')}">未來3天</text>`;
+    s += `<circle cx="${x(n)}" cy="${y(F.P10[0])}" r="5" fill="${C.m10}"/><text x="${x(n + 2) + 8}" y="${y(F.P10[0]) - 4}" font-size="15" fill="${C.m10}">第一回落區</text><text x="${x(n + 2) + 8}" y="${y(F.P10[0]) + 12}" font-size="15" font-weight="700" fill="${C.m10}">${f(F.P10[0])}</text>`;
+    s += `<circle cx="${x(n)}" cy="${y(F.P20[0])}" r="5" fill="${C.m20}"/><text x="${x(n + 2) + 8}" y="${y(F.P20[0]) + 18}" font-size="15" fill="${C.m20}">結構防守</text><text x="${x(n + 2) + 8}" y="${y(F.P20[0]) + 34}" font-size="15" font-weight="700" fill="${C.m20}">${f(F.P20[0])}</text>`;
+    s += `<text x="${x(n + 1)}" y="${H - 12}" font-size="15" text-anchor="middle" fill="${css('--sub')}">未來3天</text>`;
   }
   s += line('m20', C.m20, 2.2) + line('m10', C.m10, 2.2) + line('m5', C.m5, 2.2) + line('close', C.c, 3);
   // 標記：主升啟動、主升延伸、動能鈍化（短乖乖變化率由正轉負）
@@ -679,15 +679,15 @@ function priceChart(rows){
       const d1 = r.m5 / r.m10 - v[i - 1].m5 / v[i - 1].m10, d0 = v[i - 1].m5 / v[i - 1].m10 - v[i - 2].m5 / v[i - 2].m10;
       if (d0 > 0 && d1 < 0) mk = ['鈍', '#C8312B'];
     }
-    if (mk) s += `<circle cx="${x(i)}" cy="${y(r.close) - 18}" r="10" fill="${mk[1]}"/><text x="${x(i)}" y="${y(r.close) - 14}" font-size="12" text-anchor="middle" fill="#fff">${mk[0]}</text>`;
+    if (mk) s += `<circle cx="${x(i)}" cy="${y(r.close) - 18}" r="9" fill="${mk[1]}"/><text x="${x(i)}" y="${y(r.close) - 14}" font-size="12" text-anchor="middle" fill="#fff">${mk[0]}</text>`;
   });
-  v.forEach((r, i) => { if (i % 3 === (n - 1) % 3) s += `<text x="${x(i)}" y="${H - 12}" font-size="13" text-anchor="middle" fill="${css('--sub')}">${esc(r.date)}</text>`; });
+  v.forEach((r, i) => { if (i % 5 === (n - 1) % 5) s += `<text x="${x(i)}" y="${H - 12}" font-size="15" text-anchor="middle" fill="${css('--sub')}">${esc(r.date)}</text>`; });
   s += `</svg>`;
   const sw = (c, band) => band ? `<i style="display:inline-block;width:18px;height:12px;background:${c};opacity:.35;vertical-align:middle;margin-right:6px"></i>` : `<i style="display:inline-block;width:18px;height:4px;background:${c};vertical-align:middle;margin-right:6px"></i>`;
   const dot = (t, c) => `<i style="display:inline-block;width:18px;height:18px;line-height:18px;border-radius:50%;background:${c};color:#fff;font-size:11px;font-style:normal;text-align:center;margin-right:6px">${t}</i>`;
   $('pcLg').innerHTML = [sw(C.c) + '收盤（最粗、黑）', sw(C.m5) + '5日線（橘，最貼近收盤）', sw(C.m10) + '10日線（藍，中間）', sw(C.m20) + '20日線（綠，通常在最下）',
     sw(C.m10, 1) + '淺藍帶：10～20日線回測支撐帶', sw(C.z, 1) + '右側紅帶：未來3日支撐測試區', dot('啟', '#2E8B3E') + '主升啟動', dot('延', '#D9A21B') + '主升延伸', dot('鈍', '#C8312B') + '動能鈍化'].map(t => `<span>${t}</span>`).join('');
-  $('pchart').innerHTML = s + `<p class="note">啟＝短乖乖由潛伏期進入主升啟動帶，延＝進入主升延伸帶，鈍＝乖乖由擴大轉為縮小。未來3天照作者算法推估，不代表一定會到。圖可以左右滑動，最新的在最右邊。</p>`;
+  $('pchart').innerHTML = s + `<p class="note">啟＝短乖乖由潛伏期進入主升啟動帶，延＝進入主升延伸帶，鈍＝乖乖由擴大轉為縮小。未來3天照作者算法推估，不代表一定會到。按「放大看」可以看大圖。</p>`;
   $('pchart').scrollLeft = $('pchart').scrollWidth;
 }
 // 把圖放大到全螢幕看
@@ -695,10 +695,10 @@ function zoomSvg(id, lgId){
   const svg = $(id) && $(id).querySelector('svg'); if (!svg) return;
   const ov = document.createElement('div');
   ov.style.cssText = 'position:fixed;inset:0;z-index:999;background:var(--panel);overflow:auto;padding:calc(env(safe-area-inset-top,0px) + 12px) 12px calc(env(safe-area-inset-bottom,0px) + 12px)';
-  const w = Math.round(+svg.getAttribute('width') * 1.5);
+  const w = Math.round(+svg.getAttribute('width') * (id === 'pchart' ? 2 : 1.5));
   ov.innerHTML = '<button style="position:sticky;top:0;left:0;z-index:2;margin-bottom:10px">關閉</button>' +
     (lgId && $(lgId) ? `<div class="legend" style="color:var(--ink);font-size:1rem;margin-bottom:8px">${$(lgId).innerHTML}</div>` : '') +
-    svg.outerHTML.replace(/width="[\d.]+"/, `width="${w}"`);
+    svg.outerHTML.replace(/width="[\d.]+"/, `width="${w}" style="max-width:none;width:${w}px;height:auto"`);
   ov.querySelector('button').onclick = () => ov.remove();
   document.body.appendChild(ov);
   ov.scrollLeft = ov.scrollWidth;
