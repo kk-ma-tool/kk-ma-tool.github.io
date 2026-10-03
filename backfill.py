@@ -41,6 +41,35 @@ def twse_ex(a, b):
         out.setdefault(str(r[iC]).strip(), []).append([y * 10000 + int(g[1]) * 100 + int(g[2]), round(q / p, 6)])
     return out
 
+def caps(a, b):
+    """減資、變更面額恢復買賣（上市＋上櫃官方資料）：回傳 {code: [[恢復買賣日, 恢復買賣參考價/停止前收盤], ...]}"""
+    out = {}
+    def rows(fl, data):
+        fl = [str(x) for x in fl]
+        idx = lambda n: next((i for i, x in enumerate(fl) if n in x), -1)
+        iC, iD, iP, iR = idx('代號'), idx('恢復買賣日期'), idx('收盤'), idx('參考價')
+        if min(iC, iD, iP, iR) < 0:
+            print('  減資／面額欄位不符', fl[:6]); return
+        for r in data:
+            g = re.findall(r'\d+', str(r[iD])); p, q = U.num(r[iP]), U.num(r[iR])
+            if not g or not p or not q:
+                continue
+            if len(g) == 1:
+                s = g[0]; y, m, d = int(s[:-4]), int(s[-4:-2]), int(s[-2:])
+            else:
+                y, m, d = int(g[0]), int(g[1]), int(g[2])
+            y += 1911 if y < 1911 else 0
+            out.setdefault(str(r[iC]).strip(), []).append([y * 10000 + m * 100 + d, round(q / p, 6)])
+    for path in ('reducation/TWTAUU', 'change/TWTB8U'):
+        j = U.get(f'https://www.twse.com.tw/rwd/zh/{path}?startDate={a}&endDate={b}&response=json')
+        rows(j.get('fields') or [], j.get('data') or [])
+    q = lambda s: f'{s[:4]}%2F{s[4:6]}%2F{s[6:]}'
+    for path in ('revivt', 'pvChgRslt'):
+        j = U.get(f'https://www.tpex.org.tw/www/zh-tw/bulletin/{path}?startDate={q(a)}&endDate={q(b)}&response=json')
+        for t in j.get('tables') or []:
+            rows(t.get('fields') or [], t.get('data') or [])
+    return out
+
 def merge(ex, add):
     n = 0
     for c, lst in add.items():
@@ -71,6 +100,18 @@ def main():
             if b.year < today.year and ok and name == '上市' and a.year not in prog['ex_years']:
                 prog['ex_years'].append(a.year)
     jsave(os.path.join(H, 'ex.json'), ex)
+    # 1b) 官方減資、變更面額資料（網頁還原用，另存 cap.json，不影響股性計算）：第一次抓 2021 年起全部，之後只抓最近 60 天
+    cap = jload(os.path.join(H, 'cap.json'), {})
+    a0 = today - dt.timedelta(days=60) if prog.get('cap_all') else START
+    try:
+        got = caps(ymd(a0), ymd(today))
+        print('減資／變更面額', ymd(a0), '~', ymd(today), '：', sum(len(v) for v in got.values()), '筆，新增／更新', merge(cap, got))
+        jsave(os.path.join(H, 'cap.json'), cap)
+        if got:
+            prog['cap_all'] = True
+            jsave(os.path.join(H, 'progress.json'), prog)
+    except Exception as e:
+        print('減資／變更面額 失敗', e)
     # 2) 每天收盤價
     day, cache, cnt = START, {}, 0
     while day <= today:

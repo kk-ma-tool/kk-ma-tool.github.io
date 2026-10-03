@@ -102,16 +102,18 @@ table.flow td{text-align:left;white-space:normal;line-height:1.7}
 <script>
 // 取代 Google 版的 google.script.run：改讀每天自動更新的資料檔
 (function () {
-  var PX = null, ST = '', EX = {};
+  var PX = null, ST = '', EX = {}, CAP = {}, META = null;
   function load() {
     if (PX) return Promise.resolve();
     return Promise.all([
       fetch('data/px.json', {cache: 'no-cache'}).then(function (r) { return r.json(); }),
       fetch('data/stats.txt').then(function (r) { return r.text(); }),
       fetch('data/ex.json', {cache: 'no-cache'}).then(function (r) { return r.json(); }),
-      fetch('data/hist/ex.json', {cache: 'no-cache'}).then(function (r) { return r.json(); }).catch(function () { return {}; })
+      fetch('data/hist/ex.json', {cache: 'no-cache'}).then(function (r) { return r.json(); }).catch(function () { return {}; }),
+      fetch('data/hist/cap.json', {cache: 'no-cache'}).then(function (r) { return r.json(); }).catch(function () { return {}; }),
+      fetch('data/stats_meta.json', {cache: 'no-cache'}).then(function (r) { return r.json(); }).catch(function () { return null; })
     ]).then(function (a) {
-      PX = a[0]; ST = a[1]; EX = a[3] || {};
+      PX = a[0]; ST = a[1]; EX = a[3] || {}; CAP = a[4] || {}; META = a[5];
       // 除權息以官方資料為主；官方沒有的日子，才用每日程式算出的比例（空白的不用）
       Object.keys(a[2]).forEach(function (c) {
         var have = {}; (EX[c] || []).forEach(function (e) { have[e[0]] = 1; });
@@ -137,23 +139,33 @@ table.flow td{text-align:left;white-space:normal;line-height:1.7}
     if (!idx.length) return {error: '代號 ' + code + ' 最近沒有成交資料。'};
     var ks = idx.map(function (i) { return PX.d[i]; }), px = {};
     idx.forEach(function (i) { px[PX.d[i]] = c[i]; });
-    var used = 0, miss = 0;
+    var used = 0, miss = 0, capN = 0, CD = {}, AD = {};
+    // 減資、變更面額：官方「恢復買賣參考價÷停止前收盤」，和除權息一樣往前還原
+    (CAP[code] || []).forEach(function (e) {
+      var k = e[0], r = e[1];
+      CD[k] = 1;
+      if (k <= ks[0] || k > ks[ks.length - 1] || !(r > 0)) return;
+      capN++; AD[k] = 1;
+      ks.forEach(function (x) { if (x < k) px[x] = px[x] * r; });
+    });
     (EX[code] || []).forEach(function (e) {
       var k = e[0], r = e[1];
-      if (k <= ks[0] || k > ks[ks.length - 1]) return;
-      if (r == null || !(r > 0.3 && r < 1.5)) { miss++; return; }
-      used++;
+      if (k <= ks[0] || k > ks[ks.length - 1] || CD[k]) return;
+      if (r == null) return;   // 只被標成「不比價」、官方沒有除權息紀錄的日子：不是除權息，不用還原
+      if (!(r > 0.05 && r < 1.5)) { miss++; return; }
+      used++; AD[k] = 1;
       ks.forEach(function (x) { if (x < k) px[x] = px[x] * r; });
     });
     var note = used ? '（期間內有 ' + used + ' 次除權息，已做還原）' : '';
+    if (capN) note += '（期間內有 ' + capN + ' 次減資或變更面額，已做還原）';
     if (miss) note += '（有 ' + miss + ' 次除權息查不到配息資料，該次未還原）';
     // 減資、分割等造成的跳空（還原後單日超過 11%，ETF 30%）：均線只用跳空之後的資料
     var lim = /^00/.test(code) ? 0.3 : 0.11, cut = 0;
-    for (var j = 1; j < ks.length; j++) if (Math.abs(px[ks[j]] / px[ks[j - 1]] - 1) > lim) cut = j;
+    for (var j = 1; j < ks.length; j++) if (!AD[ks[j]] && Math.abs(px[ks[j]] / px[ks[j - 1]] - 1) > lim) cut = j;
     if (cut) { note += '（' + (Math.floor(ks[cut] / 100) % 100) + '/' + (ks[cut] % 100) + ' 股價單日跳動超過 ' + Math.round(lim * 100) + '%，可能是減資或分割，均線只用這天起的資料計算）'; ks = ks.slice(cut); }
     var L = ks[ks.length - 1];
     return {
-      stat: stat(code), adjNote: note, code: code, name: PX.n[code] || '', market: PX.m[code] || '',
+      stat: stat(code), sp: META ? String(META.from).replace(/^(\d{4})(\d\d)(\d\d)$/, function (m, y, mo, d) { return y + '/' + (+mo) + '/' + (+d); }) + '～' + String(META.to).replace(/^(\d{4})(\d\d)(\d\d)$/, function (m, y, mo, d) { return y + '/' + (+mo) + '/' + (+d); }) : '', adjNote: note, code: code, name: PX.n[code] || '', market: PX.m[code] || '',
       last: Math.floor(L / 10000) + '/' + (Math.floor(L / 100) % 100) + '/' + (L % 100),
       rows: ks.map(function (k) { return {date: (Math.floor(k / 100) % 100) + '/' + (k % 100), close: px[k]}; })
     };
@@ -269,8 +281,10 @@ function render(rows){
     $('err').hidden = false; $('out').hidden = true; return;
   }
   $('out').hidden = false;
+  window.FUT = null;
   summary(rows, valid);
   chart(valid);
+  priceChart(rows);
   table(rows);
 }
 
@@ -301,7 +315,7 @@ function summary(rows, valid){
   }
   // 收盤離各均線多少 %
   if (hasClose && last.m20 != null){
-    const pc2 = m => { const v = (last.close / m - 1) * 100; return (v >= 0 ? "+" : "") + v.toFixed(1) + "%"; };
+    const pc2 = m => { const v = (last.close / m - 1) * 100, d = last.close - m; return `${d >= 0 ? "+" : ""}${f(d)} 元（${(v >= 0 ? "+" : "") + v.toFixed(1)}%）`; };
     sup += `<br>收盤 ${f(last.close)} 元，離5日線 ${pc2(last.m5)}、離10日線 ${pc2(last.m10)}、離20日線 ${pc2(last.m20)}。`;
   }
   let chk = '';
@@ -350,7 +364,7 @@ function summary(rows, valid){
       : "<b>持平</b>");
   }
   const card = STAT
-    ? `這檔過去約 ${(STAT.days / 245).toFixed(1)} 年的資料（已做除權息還原）：乖乖平常最高大約到 <b>${STAT.S}</b>（只有 3% 的日子超過）；` +
+    ? `這檔過去約 ${(STAT.days / 245).toFixed(1)} 年的資料（已做除權息還原${STAT.sp ? '，股性資料期間 ' + STAT.sp : ''}）：乖乖平常最高大約到 <b>${STAT.S}</b>（只有 3% 的日子超過）；` +
       `明顯波段 ${STAT.n} 次，波段乖乖高點中位數 ${STAT.M ?? '—'}、偏高時約 ${STAT.P75 ?? '—'}。` +
       `<br>所以這檔的標準調整為：5香 <b>${TH.fl}–${TH.fh}</b>、警戒 <b>${TH.w}</b>、辣味 <b>${TH.h} 以上</b>（中期乖乖：5香 ${TH2.fl}–${TH2.fh}、警戒 ${TH2.w}、辣味 ${TH2.h} 以上）。` +
       ''
@@ -368,9 +382,12 @@ function summary(rows, valid){
     : '而且還在走弱，先觀望。'));
   else if (s < TH.l) pl.push(`乖乖 <b>${sv}</b>，在這檔的<b>低檔區</b>（${TH.l} 以下，作者說「3以下更好，但要視情況」）：5日線和10日線貼很近，` + (gp5 != null && gp5 > 3
     ? `乖乖還不熱，<b>但股價這幾天漲得快</b>，已經比5日線高 ${gp5.toFixed(1)}%；乖乖會比股價慢半拍，接下來幾天可能會快速變大。`
-    : '還不熱。如果剛開始要漲，這是位置最好的時候；但要確認股價站在5日線上，而且乖乖不要一路掉到 0 以下。'));
+    : hasClose && last.close < last.m5 ? `還不熱，但收盤還在5日線（${f(last.m5)} 元）下面，還沒開始轉強，要等站回5日線。`
+    : last.m != null && last.m < 0 ? '還不熱，收盤站在5日線上，但中期乖乖是負的（10日線還在20日線下面），中長期還沒轉強，算是剛要起步。'
+    : prev && prev.m != null && last.m != null && last.m > prev.m ? '還不熱，收盤站在5日線上，中期乖乖也在變大，下面的支撐在跟上，位置不錯。'
+    : '還不熱，收盤站在5日線上。如果剛開始要漲，這是位置最好的時候；但乖乖不要一路掉到 0 以下。'));
   else if (s < TH.fl) pl.push(`乖乖 <b>${sv}</b>，<b>接近5香區</b>（作者說4～7左右是5香，這檔換算約 ${TH.fl}～${TH.fh}）：還不熱，位置不差，但要確認股價站在5日線上。`);
-  else if (s <= TH.fh) pl.push(`乖乖 <b>${sv}</b>，在這檔的<b>5香區</b>（${TH.fl}～${TH.fh}）：作者最喜歡的甜蜜區，漲勢健康、不過熱，是比較舒服的介入或續抱區。`);
+  else if (s <= TH.fh) pl.push(`乖乖 <b>${sv}</b>，在這檔的<b>5香區</b>（${TH.fl}～${TH.fh}）：作者最喜歡的甜蜜區，漲勢健康、不過熱，是比較舒服的介入或續抱區。離這檔5香上緣（${TH.fh}）還有 ${f(TH.fh - s, 1)}。`);
   else if (s < TH.w) pl.push(`乖乖 <b>${sv}</b>，<b>偏熱</b>（${TH.fh}～${TH.w}）：開始熱了，不適合追，等它回落到5香區（${TH.fh} 以下）。`);
   else if (s < TH.h) pl.push(`乖乖 <b>${sv}</b>，在<b>警戒區</b>（${TH.w}～${TH.h}）：漲得急，要小心，不建議這時進場。`);
   else pl.push(`乖乖 <b>${sv}</b>，在<b>辣味區</b>（${TH.h} 以上）：短線過熱，<b>不要追</b>。作者的做法是等乖乖回落到5香區、而且下面三個條件都符合，再考慮。`);
@@ -410,7 +427,7 @@ function summary(rows, valid){
     if (upv.length) watch.push(`股價已經跌破${upv.map(v => v[0]).join('、')}，要先站回${upv[0][0]}約 <b>${f(upv[0][1])} 元</b>才算轉強。`);
   }
   if (s >= 0 && s < TH.fl) watch.push(`如果5日線跌到10日線（約 ${f(last.m10)} 元）下面，乖乖會變負數，這套看法就不適用了。`);
-  const plain = `<div style="margin-top:14px;padding:12px 14px;border-radius:12px;background:rgba(46,139,62,.08);line-height:1.85">` +
+  const mkPlain = () => `<div style="margin-top:14px;padding:12px 14px;border-radius:12px;background:rgba(46,139,62,.08);line-height:1.85">` +
     `<h3 style="margin:0 0 6px">白話解讀</h3>${pl.join('<br>')}` +
     (watch.length ? `<div style="margin-top:8px"><b>接下來看這些價位：</b><br>${watch.map(w => '・' + w).join('<br>')}</div>` : '') +
     `<div class="note" style="margin-top:8px">以上照作者方法解讀，只是參考，不是買賣建議。</div></div>`;
@@ -474,6 +491,11 @@ function summary(rows, valid){
       '<br>' + (dead ? '<b>已達結構失效</b>：收盤在20日線附近或以下、短中期乖乖同步變差、20日線轉弱，三個同時成立。'
         : `還沒達到結構失效（要同時符合：收盤在20日線附近或以下${near20 ? '✔' : '✘'}、短中期乖乖同步變差${both ? '✔' : '✘'}、20日線轉弱${weak(d20, a20) ? '✔' : '✘'}）。`) +
       (prev && last.s < prev.s && !(last.m < prev.m) ? '<br>短期乖乖回收但中期乖乖穩定，作者說這屬於動能消化，不算結構失效。' : '');
+    window.FUT = {P10: [1, 2, 3].map(P10), P20: [1, 2, 3].map(P20)};
+    if (s > TH.fh && eta) pl.push(eta);
+    pl.push(`作者的6個轉弱條件，目前符合 <b>${hit.length}</b> 項` + (hit.length ? `（${hit.map(c => c[0]).join('、')}）` : '') + (dead ? '，<b>已達結構失效</b>。' : hit.length >= 4 ? '，警戒高。' : hit.length >= 2 ? '，要注意。' : '，警戒低。'));
+    if (hasClose){ const g1 = (P10(1) / last.close - 1) * 100, g2 = (P20(1) / last.close - 1) * 100;
+      watch.push(`照作者算法，明天第一回落區（預估10日線）約 <b>${f(P10(1))} 元</b>（離今天收盤 ${(g1 >= 0 ? '+' : '') + g1.toFixed(1)}%），結構防守區（預估20日線）約 <b>${f(P20(1))} 元</b>（${(g2 >= 0 ? '+' : '') + g2.toFixed(1)}%）。` + (g1 > 0 ? '收盤已經在預估10日線下面。' : '')); }
   }
   const row = (k, v) => `<tr><th>${k}</th><td>${v}</td></tr>`;
   $('summary').innerHTML = `
@@ -483,7 +505,7 @@ function summary(rows, valid){
       <div><span class="badge" style="background:var(${z.c})">${z.t}</span><br>
       <span class="note">短期乖乖（5日線 ÷ 10日線）・${STAT ? '依這檔股性的標準' : (MODE === 'auto' ? '無個股參考資訊，用作者原始標準' : '作者原始標準')}</span></div>
     </div>
-    ${plain}
+    ${mkPlain()}
     <div class="scroll" style="margin-top:12px"><table class="flow">
       ${row('5日線', f(last.m5))}
       ${row('短期乖乖', `${f(last.s,1)}（原始比值 ${rr(last.m5, last.m10)}）　${z.t}`)}
@@ -491,7 +513,8 @@ function summary(rows, valid){
       ${row('中期乖乖', last.m == null ? '需要20日線' : `${f(last.m,1)}（原始比值 ${rr(last.m10, last.m20)}）　${zone(last.m, TH2).t}`)}
       ${row('20日線', f(last.m20))}
       ${row('短中期一起看', dual)}
-      ${row('平均變化', `近${ch.length}天平均每天 ${avgTxt}` + (down ? `，已連續縮減 ${down} 天` : ''))}
+      ${row('平均變化', `短期乖乖：近${ch.length}天平均每天 ${avgTxt}` + (down ? `，已連續縮減 ${down} 天` : '') +
+        (a5 != null ? `<br>均線平均每天變化（作者算法，依最近 ${c10.length} 個交易日）：` + [['5日線', a5], ['10日線', a10], ['20日線', a20]].filter(z => z[1] != null).map(z => `${z[0]} <b>${z[1] >= 0 ? '+' : ''}${f(z[1])}</b>`).join('、') + ' 元' : ''))}
       ${row('乖乖動能', mom)}
       ${row('預測', pred + (eta ? '<br>' + eta : ''))}
       ${row('支撐／介入區', sup + chk)}
@@ -525,12 +548,71 @@ function chart(v){
   $('chart').innerHTML = s;
 }
 
+// 作者規格第14點：收盤＋三條均線＋回測支撐帶＋未來3日支撐測試區＋啟動／延伸／鈍化標記（圖例放左側）
+function priceChart(rows){
+  if (!$('pchart')){ const d = document.createElement('div'); d.id = 'pchart'; d.className = 'scroll'; $('chart').parentNode.insertBefore(d, $('chart')); }
+  const v = rows.filter(r => r.close != null);
+  if (v.length < 2){ $('pchart').innerHTML = ''; return; }
+  const F = window.FUT, nF = F ? 3 : 0, n = v.length;
+  const LG = 150, L = LG + 46, R = 16, T = 14, B = 30, step = 40, W = L + (n - 1 + nF) * step + R, H = 280;
+  const C = {c: css('--ink') || '#222', m5: '#E07B24', m10: '#3D7FB0', m20: '#5E8F2A', z: '#C8312B'};
+  const all = [];
+  v.forEach(r => [r.close, r.m5, r.m10, r.m20].forEach(x => x != null && all.push(x)));
+  if (F) all.push(...F.P10, ...F.P20);
+  let lo = Math.min(...all), hi = Math.max(...all); const pad = (hi - lo) * 0.06 || 1; lo -= pad; hi += pad;
+  const x = i => L + i * step, y = val => T + (hi - val) / (hi - lo) * (H - T - B);
+  const line = (key, col, w, dash) => { let d = '', on = false; v.forEach((r, i) => { if (r[key] == null){ on = false; return; } d += (on ? 'L' : 'M') + x(i) + ' ' + y(r[key]); on = true; });
+    return `<path d="${d}" fill="none" stroke="${col}" stroke-width="${w}"${dash ? ` stroke-dasharray="${dash}"` : ''}/>`; };
+  let s = `<svg viewBox="0 0 ${W} ${H}" width="${W}" role="img" aria-label="收盤與均線圖">`;
+  for (let k = 0; k <= 4; k++){ const val = lo + (hi - lo) * k / 4; s += `<line x1="${L}" x2="${W - R}" y1="${y(val)}" y2="${y(val)}" stroke="${css('--line')}"/><text x="${L - 6}" y="${y(val) + 4}" font-size="11" text-anchor="end" fill="${css('--sub')}">${f(val, val < 100 ? 2 : 0)}</text>`; }
+  // 10日線～20日線回測支撐帶
+  let top = '', bot = '';
+  v.forEach((r, i) => { if (r.m10 != null && r.m20 != null){ top += `${x(i)},${y(Math.max(r.m10, r.m20))} `; bot = `${x(i)},${y(Math.min(r.m10, r.m20))} ` + bot; } });
+  if (top) s += `<polygon points="${top}${bot}" fill="${C.m10}" opacity=".13"/>`;
+  // 未來3日支撐測試區（20日線預估～10日線預估）
+  if (F){
+    let t2 = `${x(n - 1)},${y(Math.max(v[n - 1].m10 ?? F.P10[0], v[n - 1].m20 ?? F.P20[0]))} `, b2 = `${x(n - 1)},${y(Math.min(v[n - 1].m10 ?? F.P10[0], v[n - 1].m20 ?? F.P20[0]))} `;
+    for (let d = 0; d < 3; d++){ t2 += `${x(n + d)},${y(Math.max(F.P10[d], F.P20[d]))} `; b2 = `${x(n + d)},${y(Math.min(F.P10[d], F.P20[d]))} ` + b2; }
+    s += `<polygon points="${t2}${b2}" fill="${C.z}" opacity=".14"/>`;
+    s += `<line x1="${x(n - 1) + step / 2}" x2="${x(n - 1) + step / 2}" y1="${T}" y2="${H - B}" stroke="${css('--sub')}" stroke-dasharray="3 3"/>`;
+    s += `<circle cx="${x(n)}" cy="${y(F.P10[0])}" r="4" fill="${C.m10}"/><text x="${x(n) + 6}" y="${y(F.P10[0]) - 6}" font-size="11" fill="${C.m10}">第一回落區 ${f(F.P10[0])}</text>`;
+    s += `<circle cx="${x(n)}" cy="${y(F.P20[0])}" r="4" fill="${C.m20}"/><text x="${x(n) + 6}" y="${y(F.P20[0]) + 14}" font-size="11" fill="${C.m20}">結構防守 ${f(F.P20[0])}</text>`;
+    s += `<text x="${x(n + 1)}" y="${H - 10}" font-size="11" text-anchor="middle" fill="${css('--sub')}">未來3天</text>`;
+  }
+  s += line('m20', C.m20, 2) + line('m10', C.m10, 2) + line('m5', C.m5, 2) + line('close', C.c, 2.8);
+  // 標記：主升啟動、主升延伸、動能鈍化（短乖乖變化率由正轉負）
+  const st = r => r.m5 && r.m10 ? (r.m5 / r.m10 < 1 ? 0 : r.m5 / r.m10 < 1.025 ? 1 : r.m5 / r.m10 < 1.05 ? 2 : r.m5 / r.m10 < 1.08 ? 3 : 4) : null;
+  v.forEach((r, i) => {
+    if (i < 1) return;
+    const a = st(v[i - 1]), b = st(r); let mk = null;
+    if (a === 1 && b === 2) mk = ['啟', '#2E8B3E'];
+    else if (a != null && a < 3 && b === 3) mk = ['延', '#D9A21B'];
+    else if (i >= 2 && r.m5 && v[i - 1].m5 && v[i - 2].m5 && r.m10 && v[i - 1].m10 && v[i - 2].m10){
+      const d1 = r.m5 / r.m10 - v[i - 1].m5 / v[i - 1].m10, d0 = v[i - 1].m5 / v[i - 1].m10 - v[i - 2].m5 / v[i - 2].m10;
+      if (d0 > 0 && d1 < 0) mk = ['鈍', '#C8312B'];
+    }
+    if (mk) s += `<circle cx="${x(i)}" cy="${y(r.close) - 16}" r="8" fill="${mk[1]}"/><text x="${x(i)}" y="${y(r.close) - 12}" font-size="10" text-anchor="middle" fill="#fff">${mk[0]}</text>`;
+  });
+  v.forEach((r, i) => { if (i % 5 === (n - 1) % 5) s += `<text x="${x(i)}" y="${H - 10}" font-size="11" text-anchor="middle" fill="${css('--sub')}">${esc(r.date)}</text>`; });
+  // 圖例（左側）
+  const lg = [['收盤（最粗、黑）', C.c, 0], ['5日線（橘，最貼近收盤）', C.m5, 0], ['10日線（藍，中間）', C.m10, 0], ['20日線（綠，通常在最下）', C.m20, 0],
+    ['淺藍帶：10～20日線回測支撐帶', C.m10, 1], ['右側紅帶：未來3日支撐測試區', C.z, 1]];
+  lg.forEach((g, k) => { const yy = T + 8 + k * 20; s += g[2] ? `<rect x="6" y="${yy - 7}" width="16" height="10" fill="${g[1]}" opacity=".3"/>` : `<line x1="6" x2="22" y1="${yy - 2}" y2="${yy - 2}" stroke="${g[1]}" stroke-width="3"/>`;
+    s += `<text x="28" y="${yy + 2}" font-size="11" fill="${css('--ink')}">${g[0]}</text>`; });
+  [['啟', '#2E8B3E', '主升啟動'], ['延', '#D9A21B', '主升延伸'], ['鈍', '#C8312B', '動能鈍化']].forEach((g, k) => { const yy = T + 8 + (6 + k) * 20;
+    s += `<circle cx="14" cy="${yy - 3}" r="7" fill="${g[1]}"/><text x="14" y="${yy}" font-size="9" text-anchor="middle" fill="#fff">${g[0]}</text><text x="28" y="${yy + 2}" font-size="11" fill="${css('--ink')}">${g[2]}</text>`; });
+  s += `</svg><p class="note">上圖＝收盤和三條均線（作者完整版圖表）；標記：啟＝短乖乖由潛伏期進入主升啟動帶，延＝進入主升延伸帶，鈍＝乖乖由擴大轉為縮小。未來3天的區域照作者算法推估，不代表一定會到。</p>`;
+  $('pchart').innerHTML = s;
+}
+
 function table(rows){
-  let h = '<tr><th>日期</th><th>收盤</th><th>5日線</th><th>10日線</th><th>20日線</th><th>短期乖乖</th><th>中期乖乖</th><th>變化</th></tr>';
+  let h = '<tr><th>日期</th><th>收盤</th><th>5日線</th><th>10日線</th><th>20日線</th><th>5日線變化</th><th>10日線變化</th><th>20日線變化</th><th>短期乖乖</th><th>中期乖乖</th><th>乖乖變化</th></tr>';
   let prev = null;
-  rows.forEach(r => {
+  const dv = (r, q, k) => (q && r[k] != null && q[k] != null) ? (r[k] - q[k] >= 0 ? '+' : '') + f(r[k] - q[k]) : '—';
+  rows.forEach((r, ri) => {
     const d = (prev != null && r.s != null) ? r.s - prev : null;
     h += `<tr><td>${esc(r.date)}</td><td>${f(r.close)}</td><td>${f(r.m5)}</td><td>${f(r.m10)}</td><td>${f(r.m20)}</td>
+      <td>${dv(r, rows[ri - 1], 'm5')}</td><td>${dv(r, rows[ri - 1], 'm10')}</td><td>${dv(r, rows[ri - 1], 'm20')}</td>
       <td><i class="dot" style="background:var(${zone(r.s).c})"></i>${f(r.s,1)}</td><td>${f(r.m,1)}</td>
       <td>${d == null ? '—' : (d > 0 ? '▲' : d < 0 ? '▼' : '') + Math.abs(d).toFixed(1)}</td></tr>`;
     if (r.s != null) prev = r.s;
@@ -565,7 +647,7 @@ async function auto(){
     const r = await new Promise((ok, bad) =>
       google.script.run.withSuccessHandler(ok).withFailureHandler(bad).getData(code));
     if (r.error) return fail(r.error);
-    STAT = r.stat || null; MODE = 'auto';
+    STAT = r.stat || null; MODE = 'auto'; if (STAT && r.sp) STAT.sp = r.sp;
     TH = mkTH(STAT ? STAT.S / 8.2 : 1); TH2 = mkTH(STAT && STAT.S2 ? STAT.S2 / 11.46 : 1);
     const rows = r.rows.map(x => ({date: x.date, close: x.close, m5:null, m10:null, m20:null}));
     $('name').value = (r.name ? r.name + ' ' : '') + code;
