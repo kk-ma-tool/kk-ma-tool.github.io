@@ -108,8 +108,16 @@ table.flow td{text-align:left;white-space:normal;line-height:1.7}
     return Promise.all([
       fetch('data/px.json', {cache: 'no-cache'}).then(function (r) { return r.json(); }),
       fetch('data/stats.txt').then(function (r) { return r.text(); }),
-      fetch('data/ex.json', {cache: 'no-cache'}).then(function (r) { return r.json(); })
-    ]).then(function (a) { PX = a[0]; ST = a[1]; EX = a[2]; });
+      fetch('data/ex.json', {cache: 'no-cache'}).then(function (r) { return r.json(); }),
+      fetch('data/hist/ex.json', {cache: 'no-cache'}).then(function (r) { return r.json(); }).catch(function () { return {}; })
+    ]).then(function (a) {
+      PX = a[0]; ST = a[1]; EX = a[3] || {};
+      // 除權息以官方資料為主；官方沒有的日子，才用每日程式算出的比例（空白的不用）
+      Object.keys(a[2]).forEach(function (c) {
+        var have = {}; (EX[c] || []).forEach(function (e) { have[e[0]] = 1; });
+        a[2][c].forEach(function (e) { if (e[1] != null && !have[e[0]]) (EX[c] = EX[c] || []).push(e); });
+      });
+    });
   }
   function stat(code) {
     var i = ST.indexOf(';' + code + ':');
