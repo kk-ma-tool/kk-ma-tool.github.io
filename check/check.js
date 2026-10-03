@@ -3,7 +3,7 @@ const {JSDOM, VirtualConsole} = require('jsdom');
 const fs = require('fs');
 const read = p => { try { return fs.readFileSync(p, 'utf8'); } catch (e) { return null; } };
 const files = {};
-['data/px.json', 'data/stats.txt', 'data/ex.json', 'data/hist/ex.json', 'data/hist/cap.json', 'data/stats_meta.json', 'data/idx.json'].forEach(p => files[p] = read(p));
+['data/px.json', 'data/stats.txt', 'data/ex.json', 'data/hist/ex.json', 'data/hist/ex_recent.json', 'data/hist/cap.json', 'data/stats_meta.json', 'data/idx.json'].forEach(p => files[p] = read(p));
 const hard = [], warn = [];
 (async () => {
   const vc = new VirtualConsole();
