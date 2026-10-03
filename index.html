@@ -298,6 +298,7 @@ function render(rows){
   }
   $('out').hidden = false;
   window.FUT = null;
+  window.ZR = rows; window.ZV = valid;
   summary(rows, valid);
   if ($('ipb')){ $('ipb').onclick = intraday; $('ip').onkeydown = e => { if (e.key === 'Enter') intraday(); }; }
   priceChart(rows);
@@ -596,8 +597,8 @@ function summary(rows, valid){
     </table></div></details>`;
 }
 
-function chart(v){
-  const W = Math.max(520, v.length * 30), H = 280, L = 40, R = 12, T = 12, B = 30;
+function chart(v, full){
+  const W = full ? Math.max(900, v.length * 58) : Math.max(520, v.length * 30), H = 280, L = 40, R = 12, T = 12, B = 30;
   const vals = v.map(r => r.s).concat(v.map(r => r.m).filter(x => x != null));
   let lo = Math.min(0, ...vals) - 1, hi = Math.max(TH.h + 2, ...vals) + 1;
   const x = i => L + (v.length === 1 ? (W - L - R) / 2 : i * (W - L - R) / (v.length - 1));
@@ -613,16 +614,17 @@ function chart(v){
   v.forEach((r, i) => {
     s += `<circle cx="${x(i)}" cy="${y(r.s)}" r="5" fill="${css(zone(r.s).c)}" stroke="${css('--panel')}" stroke-width="2"/>`;
     s += `<text x="${x(i)}" y="${y(r.s)-10}" font-size="13" text-anchor="middle" fill="${css('--ink')}">${f(r.s,1)}</text>`;
-    if (i % 3 === (v.length - 1) % 3) s += `<text x="${x(i)}" y="${H-10}" font-size="13" text-anchor="middle" fill="${css('--sub')}">${esc(r.date)}</text>`;
+    if (full || i % 3 === (v.length - 1) % 3) s += `<text x="${x(i)}" y="${H-10}" font-size="13" text-anchor="middle" fill="${css('--sub')}">${esc(r.date)}</text>`;
   });
   s += '</svg><p class="note">實線＝短期乖乖（圓點顏色＝所在區間）；虛線＝中期乖乖（有20日線才會出現）。按「放大看」可以看大圖。</p>';
+  if (full) return s;
   $('chart').innerHTML = s;
   $('chart').scrollLeft = $('chart').scrollWidth;
   $('kzoom').onclick = () => zoomSvg('chart');
 }
 
 // 作者規格第14點：收盤＋三條均線＋回測支撐帶＋未來3日支撐測試區＋啟動／延伸／鈍化標記（圖例放左側）
-function priceChart(rows){
+function priceChart(rows, full){
   if (!$('pchart')){
     const sec = document.createElement('section'); sec.className = 'panel';
     sec.innerHTML = '<div class="phead"><h2>收盤與均線（作者完整版圖表）</h2><button class="ghost zbtn" id="pzoom">放大看</button></div>' +
@@ -633,7 +635,7 @@ function priceChart(rows){
   const v = rows.filter(r => r.close != null);
   if (v.length < 2){ $('pchart').innerHTML = ''; return; }
   const F = window.FUT, nF = F ? 3 : 0, n = v.length;
-  const L = 52, R = 112, T = 26, B = 36, step = 18, W = L + (n - 1 + nF) * step + R, H = 340;
+  const L = 52, R = 112, T = 26, B = 36, step = full ? 52 : 18, W = L + (n - 1 + nF) * step + R, H = 340;
   const C = {c: css('--ink') || '#222', m5: '#E07B24', m10: '#3D7FB0', m20: '#5E8F2A', z: '#C8312B'};
   const all = [];
   v.forEach(r => [r.close, r.m5, r.m10, r.m20].forEach(x => x != null && all.push(x)));
@@ -672,8 +674,10 @@ function priceChart(rows){
     }
     if (mk) s += `<circle cx="${x(i)}" cy="${y(r.close) - 18}" r="9" fill="${mk[1]}"/><text x="${x(i)}" y="${y(r.close) - 14}" font-size="12" text-anchor="middle" fill="#fff">${mk[0]}</text>`;
   });
-  v.forEach((r, i) => { if (i % 5 === (n - 1) % 5) s += `<text x="${x(i)}" y="${H - 12}" font-size="15" text-anchor="middle" fill="${css('--sub')}">${esc(r.date)}</text>`; });
+  v.forEach((r, i) => { if (full || i % 5 === (n - 1) % 5) s += `<text x="${x(i)}" y="${H - 12}" font-size="15" text-anchor="middle" fill="${css('--sub')}">${esc(r.date)}</text>`; });
+  if (full) v.forEach((r, i) => { s += `<text x="${x(i)}" y="${y(r.close) + 20}" font-size="13" text-anchor="middle" fill="${css('--ink')}">${f(r.close)}</text>`; });
   s += `</svg>`;
+  if (full) return s;
   const sw = (c, band) => band ? `<i style="display:inline-block;width:18px;height:12px;background:${c};opacity:.35;vertical-align:middle;margin-right:6px"></i>` : `<i style="display:inline-block;width:18px;height:4px;background:${c};vertical-align:middle;margin-right:6px"></i>`;
   const dot = (t, c) => `<i style="display:inline-block;width:18px;height:18px;line-height:18px;border-radius:50%;background:${c};color:#fff;font-size:11px;font-style:normal;text-align:center;margin-right:6px">${t}</i>`;
   $('pcLg').innerHTML = [sw(C.c) + '收盤（最粗、黑）', sw(C.m5) + '5日線（橘，最貼近收盤）', sw(C.m10) + '10日線（藍，中間）', sw(C.m20) + '20日線（綠，通常在最下）',
@@ -683,13 +687,12 @@ function priceChart(rows){
 }
 // 把圖放大到全螢幕看
 function zoomSvg(id, lgId){
-  const svg = $(id) && $(id).querySelector('svg'); if (!svg) return;
+  if (!window.ZR) return;
+  const html = (id === 'pchart' ? priceChart(window.ZR, true) : chart(window.ZV, true)).replace('<svg ', '<svg style="max-width:none" ');
   const ov = document.createElement('div');
   ov.style.cssText = 'position:fixed;inset:0;z-index:999;background:var(--panel);overflow:auto;padding:calc(env(safe-area-inset-top,0px) + 12px) 12px calc(env(safe-area-inset-bottom,0px) + 12px)';
-  const w = Math.round(+svg.getAttribute('width') * (id === 'pchart' ? 2 : 1.5));
   ov.innerHTML = '<button style="position:sticky;top:0;left:0;z-index:2;margin-bottom:10px">關閉</button>' +
-    (lgId && $(lgId) ? `<div class="legend" style="color:var(--ink);font-size:1rem;margin-bottom:8px">${$(lgId).innerHTML}</div>` : '') +
-    svg.outerHTML.replace(/width="[\d.]+"/, `width="${w}" style="max-width:none;width:${w}px;height:auto"`);
+    (lgId && $(lgId) ? `<div class="legend" style="color:var(--ink);font-size:1rem;margin-bottom:8px">${$(lgId).innerHTML}</div>` : '') + html;
   ov.querySelector('button').onclick = () => ov.remove();
   document.body.appendChild(ov);
   ov.scrollLeft = ov.scrollWidth;
