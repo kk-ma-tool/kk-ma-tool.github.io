@@ -708,15 +708,21 @@ function table(rows){
   let h = '<tr><th>日期</th><th>收盤</th><th>5日線</th><th>10日線</th><th>20日線</th><th>5日線變化</th><th>10日線變化</th><th>20日線變化</th><th>短期乖乖</th><th>中期乖乖</th><th>乖乖變化</th></tr>';
   let prev = null;
   const dv = (r, q, k) => (q && r[k] != null && q[k] != null) ? (r[k] - q[k] >= 0 ? '+' : '') + f(r[k] - q[k]) : '—';
+  const st = window.TBLALL ? 0 : Math.max(0, rows.length - 10);   // 平常只顯示最近10天，按鈕可切換全部
   rows.forEach((r, ri) => {
     const d = (prev != null && r.s != null) ? r.s - prev : null;
-    h += `<tr><td>${esc(r.date)}</td><td>${f(r.close)}</td><td>${f(r.m5)}</td><td>${f(r.m10)}</td><td>${f(r.m20)}</td>
+    if (ri >= st) h += `<tr><td>${esc(r.date)}</td><td>${f(r.close)}</td><td>${f(r.m5)}</td><td>${f(r.m10)}</td><td>${f(r.m20)}</td>
       <td>${dv(r, rows[ri - 1], 'm5')}</td><td>${dv(r, rows[ri - 1], 'm10')}</td><td>${dv(r, rows[ri - 1], 'm20')}</td>
       <td><i class="dot" style="background:var(${zone(r.s).c})"></i>${f(r.s,1)}</td><td>${f(r.m,1)}</td>
       <td>${d == null ? '—' : (d > 0 ? '▲' : d < 0 ? '▼' : '') + Math.abs(d).toFixed(1)}</td></tr>`;
     if (r.s != null) prev = r.s;
   });
   $('tbl').innerHTML = h;
+  let tb = $('tblBtn');
+  if (!tb){ tb = document.createElement('button'); tb.id = 'tblBtn'; tb.className = 'ghost zbtn'; tb.style.marginTop = '8px'; $('tbl').parentNode.after(tb); }
+  tb.hidden = rows.length <= 10;
+  tb.textContent = window.TBLALL ? '只看最近10天' : `顯示全部${rows.length}天`;
+  tb.onclick = () => { window.TBLALL = !window.TBLALL; table(rows); };
 }
 function esc(s){ return String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
 
