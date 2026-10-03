@@ -100,6 +100,9 @@ def main():
             if b.year < today.year and ok and name == '上市' and a.year not in prog['ex_years']:
                 prog['ex_years'].append(a.year)
     jsave(os.path.join(H, 'ex.json'), ex)
+    # 網頁只用得到近期資料：另存最近約 200 天的小檔，加快網頁載入
+    cut = int(ymd(today - dt.timedelta(days=200)))
+    jsave(os.path.join(H, 'ex_recent.json'), {c: [z for z in v if z[0] >= cut] for c, v in ex.items() if any(z[0] >= cut for z in v)})
     # 1b) 官方減資、變更面額資料（網頁還原用，另存 cap.json，不影響股性計算）：第一次抓 2021 年起全部，之後只抓最近 60 天
     cap = jload(os.path.join(H, 'cap.json'), {})
     a0 = today - dt.timedelta(days=60) if prog.get('cap_all') else START

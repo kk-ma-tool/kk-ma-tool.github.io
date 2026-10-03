@@ -121,7 +121,8 @@ table.mini th,table.mini td{padding:4px 10px}
       fetch('data/px.json', {cache: 'no-cache'}).then(function (r) { return r.json(); }),
       fetch('data/stats.txt').then(function (r) { return r.text(); }),
       fetch('data/ex.json', {cache: 'no-cache'}).then(function (r) { return r.json(); }),
-      fetch('data/hist/ex.json', {cache: 'no-cache'}).then(function (r) { return r.json(); }).catch(function () { return {}; }),
+      fetch('data/hist/ex_recent.json', {cache: 'no-cache'}).then(function (r) { if (!r.ok) throw 0; return r.json(); })
+        .catch(function () { return fetch('data/hist/ex.json', {cache: 'no-cache'}).then(function (r) { return r.json(); }); }).catch(function () { return {}; }),
       fetch('data/hist/cap.json', {cache: 'no-cache'}).then(function (r) { return r.json(); }).catch(function () { return {}; }),
       fetch('data/stats_meta.json', {cache: 'no-cache'}).then(function (r) { return r.json(); }).catch(function () { return null; }),
       fetch('data/idx.json', {cache: 'no-cache'}).then(function (r) { return r.json(); }).catch(function () { return null; })
@@ -276,25 +277,6 @@ const ma = (arr, i, n) => {
 };
 const f = (v, d = 2) => v == null ? '—' : String(Number((+v).toFixed(d)));
 
-function parse(text){
-  const rows = [];
-  text.split(/\r?\n/).forEach((line, idx) => {
-    line = line.trim(); if (!line) return;
-    const tok = line.split(/[\s,，\t]+/).filter(Boolean);
-    let date = `第${rows.length + 1}天`;
-    if (tok.length && /[\/\-年月]/.test(tok[0])) date = tok.shift();
-    const n = tok.map(x => parseFloat(x.replace(/[^\d.\-]/g, '')));
-    if (!n.length || n.some(isNaN)) throw `第 ${idx + 1} 行看不懂：「${line}」`;
-    const r = {date, close:null, m5:null, m10:null, m20:null};
-    if (n.length === 1) r.close = n[0];
-    else if (n.length === 2) [r.m5, r.m10] = n;
-    else if (n.length === 3) [r.m5, r.m10, r.m20] = n;
-    else [r.close, r.m5, r.m10, r.m20] = n;
-    rows.push(r);
-  });
-  if (!rows.length) throw '還沒貼資料';
-  return compute(rows);
-}
 function compute(rows){
   // 只有收盤價的行：自己算均線
   const closes = rows.map(r => r.close);
@@ -307,13 +289,6 @@ function compute(rows){
   return rows;
 }
 
-function run(){
-  $('err').hidden = true;
-  let rows;
-  STAT = null; TH = mkTH(1); TH2 = mkTH(1); MODE = 'manual';
-  try { rows = parse($('data').value); } catch(e){ $('err').textContent = e; $('err').hidden = false; $('out').hidden = true; return; }
-  render(rows);
-}
 function render(rows){
   const valid = rows.filter(r => r.s != null);
   if (!valid.length){
@@ -334,10 +309,12 @@ function intraday(){
   const p = parseFloat($('ip').value);
   if (!(p > 0) || !window.RAW) return;
   const base = window.RAW.map(x => ({date: x.date, close: x.close, m5: null, m10: null, m20: null}));
-  base.push({date: '盤中', close: p, m5: null, m10: null, m20: null});
+  const tw = new Date(Date.now() + 8 * 3600e3), today = (tw.getUTCMonth() + 1) + '/' + tw.getUTCDate();
+  const after = window.RAW.length && window.RAW[window.RAW.length - 1].date === today;   // 今天收盤資料已經更新：這時試算的是明天
+  base.push({date: after ? '明天試算' : '盤中', close: p, m5: null, m10: null, m20: null});
   render(compute(base).slice(-30));
   $('ip').value = p;
-  $('autoMsg').textContent = `盤中試算：把現價 ${p} 當成今天收盤來計算，不是正式收盤資料；收盤後請重新查詢。`;
+  $('autoMsg').textContent = after ? `明天試算：今天的收盤資料已經更新，把 ${p} 當成明天收盤來計算。` : `盤中試算：把現價 ${p} 當成今天收盤來計算，不是正式收盤資料；收盤後請重新查詢。`;
 }
 // 頁面上方的大盤乖乖
 window.mkBar = r => {
@@ -478,8 +455,9 @@ function summary(rows, valid){
   if (hasClose && cl.length >= 10 && last.m5 && last.m10){
     const R = last.m5 / last.m10, s4 = cl.slice(-4).reduce((a,b)=>a+b,0), s9 = cl.slice(-9).reduce((a,b)=>a+b,0);
     const x = (R * s9 - 2 * s4) / (2 - R), cp = last.close;
-    if (x > cp * 1.1) watch.push(`明天就算漲停，乖乖還是會變小（要收在約 ${f(x)} 元以上才會變大）。`);
-    else if (x < cp * 0.9) watch.push(`明天就算跌停，乖乖還是會變大（要收在約 ${f(x)} 元以下才會變小）。`);
+    const etf = / 00[0-9A-Z]+$/.test($('name').value);
+    if (x > cp * 1.1) watch.push(`明天就算${etf ? '漲10%' : '漲停'}，乖乖還是會變小（要收在約 ${f(x)} 元以上才會變大）。`);
+    else if (x < cp * 0.9) watch.push(`明天就算${etf ? '跌10%' : '跌停'}，乖乖還是會變大（要收在約 ${f(x)} 元以下才會變小）。`);
     else watch.push(`明天收盤<b>高於約 ${f(x)} 元</b>，乖乖會變大；低於這個價，乖乖會變小。`);
   }
   if (hasClose && last.m5 != null){
@@ -564,11 +542,11 @@ function summary(rows, valid){
   // 補充（不是作者算法）：直接用明天的收盤去算，收盤確定時就是準的
   let extra = '需要20天以上的收盤價';
   if (hasClose && cl.length >= 20 && last.m5 && last.m10){
-    const isIdx = /TAIEX/.test($('name').value), cp = last.close;
+    const isIdx = /TAIEX/.test($('name').value), isEtf = / 00[0-9A-Z]+$/.test($('name').value), cp = last.close;
     const calc = p => { const c2 = cl.concat([p]), n = c2.length, av = k => c2.slice(n - k).reduce((a, b) => a + b, 0) / k; return {s: kk(av(5), av(10)), m10: av(10), m20: av(20)}; };
     const R0 = last.m5 / last.m10, q4 = cl.slice(-4).reduce((a, b) => a + b, 0), q9 = cl.slice(-9).reduce((a, b) => a + b, 0), bx = (R0 * q9 - 2 * q4) / (2 - R0);
     const b0 = calc(cp), dir = v => v > s ? '變大' : v < s ? '變小' : '持平';
-    const sc = isIdx ? [['跌3%', -0.03], ['跌1%', -0.01], ['平盤', 0], ['漲1%', 0.01], ['漲3%', 0.03]] : [['跌停', -0.1], ['跌3%', -0.03], ['平盤', 0], ['漲3%', 0.03], ['漲停', 0.1]];
+    const sc = isIdx ? [['跌3%', -0.03], ['跌1%', -0.01], ['平盤', 0], ['漲1%', 0.01], ['漲3%', 0.03]] : [[isEtf ? '跌10%' : '跌停', -0.1], ['跌3%', -0.03], ['平盤', 0], ['漲3%', 0.03], [isEtf ? '漲10%' : '漲停', 0.1]];
     extra = `<b>以今天收盤估算</b>（明天收在 ${f(cp)} 時）：短期乖乖約 <b>${f(b0.s, 1)}</b>（${dir(b0.s)}），第一回落區（10日線）約 <b>${f(b0.m10)}</b>、結構防守區（20日線）約 <b>${f(b0.m20)}</b>。` +
       `<br>分界價：明天收盤<b>高於約 ${f(bx)}</b>，乖乖才會變大；低於這個價會變小。` +
       `<div class="scroll"><table class="mini"><tr><th>明天收盤</th><th>價格</th><th>短期乖乖</th><th>10日線</th><th>20日線</th></tr>` +
