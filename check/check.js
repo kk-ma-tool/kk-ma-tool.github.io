@@ -3,7 +3,7 @@ const {JSDOM, VirtualConsole} = require('jsdom');
 const fs = require('fs');
 const read = p => { try { return fs.readFileSync(p, 'utf8'); } catch (e) { return null; } };
 const files = {};
-['data/px.json', 'data/stats.txt', 'data/ex.json', 'data/hist/ex.json', 'data/hist/cap.json', 'data/stats_meta.json'].forEach(p => files[p] = read(p));
+['data/px.json', 'data/stats.txt', 'data/ex.json', 'data/hist/ex.json', 'data/hist/cap.json', 'data/stats_meta.json', 'data/idx.json'].forEach(p => files[p] = read(p));
 const hard = [], warn = [];
 (async () => {
   const vc = new VirtualConsole();
@@ -14,6 +14,7 @@ const hard = [], warn = [];
   const w = dom.window, $ = id => w.document.getElementById(id);
   const px = JSON.parse(files['data/px.json']);
   const codes = Object.keys(px.c).filter(c => px.c[c][px.c[c].length - 1] != null);
+  if (files['data/idx.json']) codes.push('TAIEX');
   let ok = 0;
   for (const c of codes){
     $('code').value = c; $('auto').click();
