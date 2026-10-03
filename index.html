@@ -222,6 +222,7 @@ table.mini th,table.mini td{padding:4px 10px}
     var A = [], B = [], K = PX.d[PX.d.length - 1];
     Object.keys(PX.c).forEach(function (code) {
       var arr = PX.c[code]; if (arr[arr.length - 1] == null) return;
+      if (/^00/.test(code)) return;   // 清單只列個股，排除 ETF
       var r = getData(code); if (r.error || !r.rows || r.rows.length < 12) return;
       var T = mkTH(r.stat ? r.stat.S / 8.2 : 1);
       var rows = compute(r.rows.map(function (x) { return {date: x.date, close: x.close, m5: null, m10: null, m20: null}; }));
@@ -336,7 +337,7 @@ $('candBtn').onclick = () => {
   google.script.run.withSuccessHandler(r => {
     const btn = x => `<button class="ghost zbtn" data-c="${x[0]}">${esc(x[1])} ${x[0]}（${f(x[2], 1)}）</button>`;
     $('candOut').innerHTML = `<h2 style="margin-top:14px">今日5香＋三綠清單（資料日 ${r.date}）</h2>` +
-      `<p class="hint">條件照作者：乖乖在這檔的5香區、比前一天縮小、收盤站在5日線上、沒破前3天最低收盤。<b>回測顯示這個組合10天後平均只比大盤多約0.4%、贏大盤的機率不到一半，只能當溫度計參考，不是買進訊號。</b></p>` +
+      `<p class="hint">只列個股、不含ETF。條件照作者：乖乖在這檔的5香區、比前一天縮小、收盤站在5日線上、沒破前3天最低收盤。<b>回測顯示這個組合10天後平均只比大盤多約0.4%、贏大盤的機率不到一半，只能當溫度計參考，不是買進訊號。</b></p>` +
       `<p><b>剛回到5香區（昨天還在5香以上）：${r.a.length} 檔</b></p><div class="row">${r.a.map(btn).join('') || '（沒有）'}</div>` +
       `<p><b>原本就在5香區：${r.b.length} 檔</b></p><div class="row">${r.b.map(btn).join('') || '（沒有）'}</div>`;
     $('candOut').querySelectorAll('button[data-c]').forEach(b => b.onclick = () => { $('code').value = b.dataset.c; auto(); window.scrollTo(0, 0); });
