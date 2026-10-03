@@ -615,7 +615,8 @@ function chart(v){
   const band = (a, b, c) => { const y1 = y(Math.min(b, hi)), y2 = y(Math.max(a, lo)); return y2 > y1 ? `<rect x="${L}" y="${y1}" width="${W-L-R}" height="${y2-y1}" fill="${css(c)}" opacity=".16"/>` : ''; };
   let s = `<svg viewBox="0 0 ${W} ${H}" width="${W}" role="img" aria-label="乖乖走勢圖">`;
   s += band(0,TH.l,'--cold') + band(TH.l,TH.fh,'--five') + band(TH.fh,TH.w,'--mid') + band(TH.w,TH.h,'--warn') + band(TH.h,hi,'--hot');
-  [0,TH.l,TH.fl,TH.fh,TH.w,TH.h].forEach(t => { if (t > lo && t < hi) s += `<text x="${L-6}" y="${y(t)+4}" font-size="13" text-anchor="end" fill="${css('--sub')}">${t}</text><line x1="${L}" x2="${W-R}" y1="${y(t)}" y2="${y(t)}" stroke="${css('--line')}"/>`; });
+  let ly = 1e9;   // 區間數字太靠近時只標一個，避免重疊
+  [0,TH.l,TH.fl,TH.fh,TH.w,TH.h].forEach(t => { if (t > lo && t < hi) s += (Math.abs(y(t) - ly) > 13 ? (ly = y(t), `<text x="${L-6}" y="${y(t)+4}" font-size="13" text-anchor="end" fill="${css('--sub')}">${t}</text>`) : '') + `<line x1="${L}" x2="${W-R}" y1="${y(t)}" y2="${y(t)}" stroke="${css('--line')}"/>`; });
   const path = key => { let d = '', on = false; v.forEach((r, i) => { if (r[key] == null){ on = false; return; } d += (on ? 'L' : 'M') + x(i) + ' ' + y(r[key]); on = true; }); return d; };
   s += `<path d="${path('m')}" fill="none" stroke="${css('--sub')}" stroke-width="2" stroke-dasharray="5 4"/>`;
   s += `<path d="${path('s')}" fill="none" stroke="${css('--ink')}" stroke-width="2.5"/>`;
@@ -665,7 +666,7 @@ function priceChart(rows){
     s += `<line x1="${x(n - 1) + step / 2}" x2="${x(n - 1) + step / 2}" y1="${T}" y2="${H - B}" stroke="${css('--sub')}" stroke-dasharray="3 3"/>`;
     s += `<circle cx="${x(n)}" cy="${y(F.P10[0])}" r="5" fill="${C.m10}"/><text x="${x(n + 2) + 8}" y="${y(F.P10[0]) - 4}" font-size="15" fill="${C.m10}">第一回落區</text><text x="${x(n + 2) + 8}" y="${y(F.P10[0]) + 12}" font-size="15" font-weight="700" fill="${C.m10}">${f(F.P10[0])}</text>`;
     s += `<circle cx="${x(n)}" cy="${y(F.P20[0])}" r="5" fill="${C.m20}"/><text x="${x(n + 2) + 8}" y="${y(F.P20[0]) + 18}" font-size="15" fill="${C.m20}">結構防守</text><text x="${x(n + 2) + 8}" y="${y(F.P20[0]) + 34}" font-size="15" font-weight="700" fill="${C.m20}">${f(F.P20[0])}</text>`;
-    s += `<text x="${x(n + 1)}" y="${H - 12}" font-size="15" text-anchor="middle" fill="${css('--sub')}">未來3天</text>`;
+    s += `<text x="${x(n + 1)}" y="${T - 8}" font-size="15" text-anchor="middle" fill="${css('--sub')}">未來3天</text>`;
   }
   s += line('m20', C.m20, 2.2) + line('m10', C.m10, 2.2) + line('m5', C.m5, 2.2) + line('close', C.c, 3);
   // 標記：主升啟動、主升延伸、動能鈍化（短乖乖變化率由正轉負）
