@@ -109,7 +109,7 @@ table.mini th,table.mini td{padding:4px 10px}
     </section>
   </div>
 
-  <p class="note">依原作者<b style="font-size:2em;margin:0 .15em;vertical-align:-0.1em;background:linear-gradient(90deg,#3D7FB0,#D9A21B,#8FA33A,#E07B24,#C8312B);-webkit-background-clip:text;background-clip:text;color:transparent">精靈良少</b>說法：乖乖只是參考依據，不是絕對；每檔股性不同，最好先回頭看這檔過去「起漲到回落」時乖乖怎麼變化。5日線跌到10日線下面時（數字變負），這套看法不適用。</p>
+  <p class="note">作者<b style="font-size:2em;margin:0 .15em;vertical-align:-0.1em;background:linear-gradient(90deg,#3D7FB0,#D9A21B,#8FA33A,#E07B24,#C8312B);-webkit-background-clip:text;background-clip:text;color:transparent">精靈良少</b>：乖乖只是參考依據，不是絕對；每檔股性不同，最好先回頭看這檔過去「起漲到回落」時乖乖怎麼變化。5日線跌到10日線下面時（數字變負），這套看法不適用。</p>
   <p class="note" style="margin-top:6px">資料來源：臺灣證券交易所、證券櫃檯買賣中心（每個交易日收盤後自動更新）。</p>
 </main>
 
@@ -383,11 +383,11 @@ window.mkBar = r => {
 $('candBtn').onclick = () => {
   $('candOut').innerHTML = '<p class="hint">全市場計算中…</p>';
   google.script.run.withSuccessHandler(r => {
-    const btn = x => `<button class="ghost zbtn" data-c="${x[0]}">${esc(x[1])} ${x[0]}（${f(x[2], 1)}）</button>`;
+    const btn = c => x => `<button class="ghost zbtn" data-c="${x[0]}" style="color:var(${c});border-color:var(${c})">${esc(x[1])} ${x[0]}（${f(x[2], 1)}）</button>`;
     $('candOut').innerHTML = `<h2 style="margin-top:14px">今日5香＋三綠清單（資料日 ${r.date}）</h2>` +
       `<p class="hint">只列個股、不含ETF。條件：乖乖在這檔的5香區、比前一天縮小、收盤站在5日線上、沒破前3天最低收盤。<b>只能當溫度計參考，不是買進訊號。</b></p>` +
-      `<p><b>剛回到5香區（昨天還在5香以上）：${r.a.length} 檔</b></p><div class="row">${r.a.map(btn).join('') || '（沒有）'}</div>` +
-      `<p><b>原本就在5香區：${r.b.length} 檔</b></p><div class="row">${r.b.map(btn).join('') || '（沒有）'}</div>`;
+      `<p><b style="color:var(--green)">剛回到5香區（昨天還在5香以上）：${r.a.length} 檔</b></p><div class="row">${r.a.map(btn('--green')).join('') || '（沒有）'}</div>` +
+      `<p><b style="color:var(--five)">原本就在5香區：${r.b.length} 檔</b></p><div class="row">${r.b.map(btn('--five')).join('') || '（沒有）'}</div>`;
     $('candOut').querySelectorAll('button[data-c]').forEach(b => b.onclick = () => { $('code').value = b.dataset.c; auto(); window.scrollTo(0, 0); });
   }).withFailureHandler(() => { $('candOut').innerHTML = '<p class="err">清單計算失敗，請重新整理再試。</p>'; }).cands();
 };
@@ -454,7 +454,7 @@ function summary(rows, valid){
       : "<b>持平</b>");
   }
   const card = STAT
-    ? `這檔過去約 ${(STAT.days / 245).toFixed(1)} 年的資料（已做除權息還原${STAT.sp ? '，股性資料期間 ' + STAT.sp : ''}）：乖乖平常最高大約到 <b>${STAT.S}</b>（只有 3% 的日子超過）；` +
+    ? `這檔過去約 ${(STAT.days / 245).toFixed(1)} 年的資料：乖乖平常最高大約到 <b>${STAT.S}</b>（只有 3% 的日子超過）；` +
       `明顯波段 ${STAT.n} 次，波段乖乖高點中位數 ${STAT.M ?? '—'}、偏高時約 ${STAT.P75 ?? '—'}。` +
       `<br>所以這檔的標準調整為：5香 <b>${TH.fl}–${TH.fh}</b>、警戒 <b>${TH.w}</b>、辣味 <b>${TH.h} 以上</b>（中期乖乖：5香 ${TH2.fl}–${TH2.fh}、警戒 ${TH2.w}、辣味 ${TH2.h} 以上）。` +
       ''
