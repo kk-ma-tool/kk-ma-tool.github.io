@@ -1,7 +1,7 @@
 name: 每季重算股性
 on:
   schedule:
-    - cron: '30 11 5 1,4,7,10 *'
+    - cron: '30 11 5-9 1,4,7,10 *'   # 5～9 號每天都排一次，GitHub 排程失敗時隔天會自動補跑；本季跑過就跳過
   workflow_dispatch:
     inputs:
       check:
@@ -22,12 +22,19 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - run: pip install numpy pandas
-      - if: ${{ inputs.check }}
+      - name: 本季已經重算過就跳過（只有排程啟動才檢查）
+        if: ${{ github.event_name == 'schedule' }}
+        run: |
+          m=$(TZ=Asia/Taipei date +%Y%m)05
+          t=$(python -c "import json;print(json.load(open('data/stats_meta.json'))['to'])")
+          if [ "$t" -ge "$m" ]; then echo "本季已重算（資料到 $t），跳過"; echo "SKIP=1" >> $GITHUB_ENV; fi
+      - if: ${{ env.SKIP != '1' }}
+        run: pip install numpy pandas
+      - if: ${{ env.SKIP != '1' && inputs.check }}
         run: python -u stats.py --check 20261001
-      - if: ${{ !inputs.check }}
+      - if: ${{ env.SKIP != '1' && !inputs.check }}
         run: python -u stats.py
-      - if: ${{ !inputs.check }}
+      - if: ${{ env.SKIP != '1' && !inputs.check }}
         run: |
           git config user.name "kk-ma-tool-bot"
           git config user.email "kk-ma-tool-bot@users.noreply.github.com"
