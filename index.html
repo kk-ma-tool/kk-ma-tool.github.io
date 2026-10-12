@@ -567,7 +567,7 @@ function summary(rows, valid){
       `<br>分界價：明天收盤<b>高於約 ${f(bx)}</b>，乖乖才會變大；低於這個價會變小。` +
       `<div class="scroll"><table class="mini"><tr><th>明天收盤</th><th>價格</th><th>短期乖乖</th><th>10日線</th><th>20日線</th></tr>` +
       sc.map(z => { const p = cp * (1 + z[1]), c = calc(p); return `<tr><td>${z[0]}</td><td>${f(p)}</td><td>${f(c.s, 1)}（${dir(c.s)}）</td><td>${f(c.m10)}</td><td>${f(c.m20)}</td></tr>`; }).join('') + `</table></div>` +
-      `<span class="note">這一區直接用明天的收盤去算，收盤確定時數字就是準的（漲跌停價為約略值）。和上面的預測方向不同時，以明天實際收盤落在哪一格為準。全市場測試：這種算法的乖乖方向約 93% 正確、10日線誤差約 0.2%；上面預測的平均推估約 43%、0.6%。</span>`;
+      `<span class="note">這一區直接用明天的收盤去算，收盤確定時數字就是準的（漲跌停價為約略值）。和上面的預測方向不同時，以明天實際收盤落在哪一格為準。</span>`;
   }
   const row = (k, v) => `<tr><th>${k}</th><td>${v}</td></tr>`;
   $('summary').innerHTML = `
