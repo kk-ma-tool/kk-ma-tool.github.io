@@ -263,7 +263,7 @@ function hl(h){
   // 乖乖數值：依區間顏色（中期乖乖用中期的區間）
   h = h.replace(new RegExp('(中期乖乖約 )<b>' + N + '</b>', 'g'), (m, a, v) => a + kc(v, TH2));
   h = h.replace(new RegExp('(乖乖(?:是|約)?\\s*)<b>' + N + '</b>', 'g'), (m, a, v) => a + kc(v));
-  h = h.replace(new RegExp('(現在 |預估明天 )' + N + '（原始比值', 'g'), (m, a, v) => a + kc(v) + '（原始比值');
+  h = h.replace(new RegExp('(現在 )' + N + '（', 'g'), (m, a, v) => a + kc(v) + '（');
   h = h.replace(new RegExp('(預估明天 )<b>' + N + '</b>', 'g'), (m, a, v) => a + kc(v));
   h = h.replace(new RegExp('<td>' + N + '（(變大|變小|持平)）</td>', 'g'), (m, v, d) => `<td>${kc(v)}（${d}）</td>`);
   // 區間名稱與這檔標準：依區間顏色
@@ -538,8 +538,8 @@ function summary(rows, valid){
     const st0 = stageOf(r0), st1 = stageOf(r1);
     const p20 = (a20 != null && last.m20) ? last.m20 + a20 : null;
     pred = `依最新均線＋平均每天變化推估：明天5日線約 <b>${f(p5)}</b>、10日線約 <b>${f(p10)}</b>` + (p20 ? `、20日線約 <b>${f(p20)}</b>` : '') +
-      ` 元；短期乖乖約 <b>${f(kk(p5, p10), 1)}</b>（原始比值 ${r1.toFixed(3)}）` + (p20 ? `、中期乖乖約 <b>${f(kk(p10, p20), 1)}</b>（原始比值 ${(p10 / p20).toFixed(3)}）` : '') + `。${winTxt}`;
-    kick = `現在 ${f(last.s, 1)}（原始比值 ${rr(last.m5, last.m10)}，${st0}）→ 預估明天 <b>${f(kk(p5, p10), 1)}</b>（原始比值 ${r1.toFixed(3)}，${st1}）。` +
+      ` 元；短期乖乖約 <b>${f(kk(p5, p10), 1)}</b>` + (p20 ? `、中期乖乖約 <b>${f(kk(p10, p20), 1)}</b>` : '') + `。${winTxt}`;
+    kick = `現在 ${f(last.s, 1)}（${st0}）→ 預估明天 <b>${f(kk(p5, p10), 1)}</b>（${st1}）。` +
       (st0 === '潛伏期' && st1 === '主升啟動帶' ? '<b>由潛伏期往主升啟動帶移動</b>，是啟動觀察訊號。'
         : st0 === st1 ? `預估還停在${st1}。` : `預估由${st0}移到${st1}。`) + winTxt;
   }
@@ -615,9 +615,9 @@ function summary(rows, valid){
     ${mkPlain()}
     <details class="fold" ${innerWidth > 700 ? 'open' : ''}><summary>完整分析表（各項數值，點開看）</summary><div class="scroll"><table class="flow">
       ${row('5日線', f(last.m5))}
-      ${row('短期乖乖', `<b style="color:var(${z.c})">${f(last.s,1)}</b>（原始比值 ${rr(last.m5, last.m10)}）　<b style="color:var(${z.c})">${z.t}</b>`)}
+      ${row('短期乖乖', `<b style="color:var(${z.c})">${f(last.s,1)}</b>　<b style="color:var(${z.c})">${z.t}</b>`)}
       ${row('10日線', f(last.m10))}
-      ${row('中期乖乖', last.m == null ? '需要20日線' : `<b style="color:var(${zone(last.m, TH2).c})">${f(last.m,1)}</b>（原始比值 ${rr(last.m10, last.m20)}）　<b style="color:var(${zone(last.m, TH2).c})">${zone(last.m, TH2).t}</b>`)}
+      ${row('中期乖乖', last.m == null ? '需要20日線' : `<b style="color:var(${zone(last.m, TH2).c})">${f(last.m,1)}</b>　<b style="color:var(${zone(last.m, TH2).c})">${zone(last.m, TH2).t}</b>`)}
       ${row('20日線', f(last.m20))}
       ${row('短中期一起看', dual)}
       ${row('平均變化', `短期乖乖：全部 ${ch.length} 天平均每天 ${avgTxt}` + (down ? `，已連續縮減 ${down} 天` : '') +
