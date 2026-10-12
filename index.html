@@ -36,6 +36,8 @@ textarea{min-height:180px;font-size:.95rem}
 .hint{font-size:.88rem;color:var(--sub);margin:8px 0 0}
 .hint code{background:var(--bg);padding:1px 5px;border-radius:4px}
 .row{display:flex;gap:10px;flex-wrap:wrap;margin-top:12px}
+.pz{color:#1F5F9E}
+@media (prefers-color-scheme: dark){.pz{color:#8EC1EA}}
 button{font:inherit;font-weight:700;border:0;border-radius:999px;padding:10px 22px;cursor:pointer;background:var(--green);color:#fff}
 button.ghost{background:transparent;color:var(--ink);border:1px solid var(--line)}
 button:focus-visible,input:focus-visible,textarea:focus-visible{outline:3px solid var(--five);outline-offset:2px}
@@ -254,6 +256,37 @@ function kk(a, b){
 const r1 = x => Math.round(x * 10) / 10;
 function mkTH(k){ return {k, l: r1(3 * k), fl: r1(4 * k), fh: r1(7 * k), w: r1(9 * k), h: r1(11 * k)}; }
 let TH = mkTH(1), TH2 = mkTH(1), STAT = null, MODE = 'manual';
+// 重點上色：乖乖數值依所在區間、價位、少數重點字眼（不要整份五顏六色）
+function hl(h){
+  const N = '(-?\\d+(?:\\.\\d+)?)', P = '(\\d[\\d,]*(?:\\.\\d+)?)';
+  const kc = (v, t) => `<b style="color:var(${zone(+v, t || TH).c})">${v}</b>`;
+  // 乖乖數值：依區間顏色（中期乖乖用中期的區間）
+  h = h.replace(new RegExp('(中期乖乖約 )<b>' + N + '</b>', 'g'), (m, a, v) => a + kc(v, TH2));
+  h = h.replace(new RegExp('(乖乖(?:是|約)?\\s*)<b>' + N + '</b>', 'g'), (m, a, v) => a + kc(v));
+  h = h.replace(new RegExp('(現在 |預估明天 )' + N + '（原始比值', 'g'), (m, a, v) => a + kc(v) + '（原始比值');
+  h = h.replace(new RegExp('(預估明天 )<b>' + N + '</b>', 'g'), (m, a, v) => a + kc(v));
+  h = h.replace(new RegExp('<td>' + N + '（(變大|變小|持平)）</td>', 'g'), (m, v, d) => `<td>${kc(v)}（${d}）</td>`);
+  // 區間名稱與這檔標準：依區間顏色
+  [['低檔區', '--cold'], ['接近5香區', '--five'], ['5香區', '--five'], ['辣味區', '--hot'], ['警戒區', '--warn']].forEach(([w, c]) => {
+    h = h.split(`<b>${w}</b>`).join(`<b style="color:var(${c})">${w}</b>`);
+  });
+  [['5香 <b>', '--five'], ['警戒 <b>', '--warn']].forEach(([w, c]) => { h = h.split(w).join(w.replace('<b>', `<b style="color:var(${c})">`)); });
+  h = h.replace(new RegExp('辣味 <b>' + N + ' 以上</b>', 'g'), (m, v) => `辣味 <b style="color:var(--hot)">${v}</b> 以上`);
+  // 價位：粗體深藍（正負號開頭的是距離，不上色）
+  h = h.replace(new RegExp('([+\\-])?(?:<b>)?' + P + '(?:～' + P + ')?(?:</b>)?( 元)', 'g'), (m, sg, a, b) => sg ? m : `<b class="pz">${a}${b ? '～' + b : ''} 元</b>`);
+  h = h.replace(new RegExp('約 <b>' + P + '</b>', 'g'), (m, v) => `約 <b class="pz">${v}</b>`);
+  h = h.replace(new RegExp('(線約 |高於約 )' + P + '(?![\\d.])', 'g'), (m, a, v) => `${a}<b class="pz">${v}</b>`);
+  h = h.replace(new RegExp('(第\\d天 )' + P + '～' + P, 'g'), (m, a, x, y) => `${a}<b class="pz">${x}～${y}</b>`);
+  // 少數重點字眼：綠＝好、紅＝危險、橘＝提醒
+  const bold = (arr, c) => arr.forEach(w => { h = h.split(`<b>${w}</b>`).join(`<b style="color:var(${c})">${w}</b>`); });
+  const paint = (arr, c) => arr.forEach(w => { h = h.split(w).join(`<span style="color:var(${c});font-weight:700">${w}</span>`); });
+  bold(['由潛伏期往主升啟動帶移動', '同步上揚'], '--green');
+  bold(['同步下彎'], '--warn');
+  paint(['股價沒有走壞', '健康的休息', '力道回來了', '三個條件都符合', '警戒低', '漲勢健康'], '--green');
+  paint(['不要追', '短線過熱', '這套看法<b>不適用</b>', '警戒高', '已達結構失效', '開始轉弱', '還在走弱'], '--hot');
+  paint(['要注意', '乖離擴張', '還沒開始轉強', '還不是介入時機'], '--warn');
+  return h;
+}
 function zone(v, t = TH){
   if (v == null) return {t:'—', c:'--line'};
   if (v < 0)  return {t:'5日線在10日線下（不適用）', c:'--sub'};
@@ -398,14 +431,14 @@ function summary(rows, valid){
   let dual = "需要20日線";
   if (prev && last.m !== null && prev.m !== null){
     const sUp = last.s > prev.s, sDn = last.s < prev.s, mUp = last.m > prev.m, mDn = last.m < prev.m;
-    dual = sUp && mUp ? "短期、中期乖乖<b>一起變大</b>：整體力道在加強。"
-      : sDn && mDn ? "短期、中期乖乖<b>一起變小</b>：正在整理；連續幾天都這樣，才需要提高警覺。"
-      : sUp && mDn ? "短期乖乖變大、中期乖乖變小：<b>短線轉強、中長期收斂</b>。"
-      : sDn && mUp ? "短期乖乖變小、中期乖乖變大：<b>短線降溫、中長期支撐補強</b>。"
-      : sUp ? "短期乖乖變大、中期乖乖持平：短線轉強，但中長期還沒跟上，要小心拉太開。"
-      : sDn ? "短期乖乖變小、中期乖乖持平：短乖乖回收、中乖乖穩定，優先看成<b>動能消化</b>。"
-      : mUp ? "短期乖乖持平、中期乖乖變大：下面的支撐在跟上來。"
-      : mDn ? "短期乖乖持平、中期乖乖變小：中長期力道在收斂。"
+    dual = sUp && mUp ? "短期、中期乖乖<b>一起變大</b>：<b style=\"color:var(--green)\">整體力道在加強</b>。"
+      : sDn && mDn ? "短期、中期乖乖<b>一起變小</b>：<b style=\"color:var(--warn)\">正在整理</b>；連續幾天都這樣，才需要提高警覺。"
+      : sUp && mDn ? "短期乖乖變大、中期乖乖變小：<b style=\"color:var(--warn)\">短線轉強、中長期收斂</b>。"
+      : sDn && mUp ? "短期乖乖變小、中期乖乖變大：<b style=\"color:var(--green)\">短線降溫、中長期支撐補強</b>。"
+      : sUp ? "短期乖乖變大、中期乖乖持平：短線轉強，但<b style=\"color:var(--warn)\">中長期還沒跟上</b>，要小心拉太開。"
+      : sDn ? "短期乖乖變小、中期乖乖持平：短乖乖回收、中乖乖穩定，優先看成<b style=\"color:var(--green)\">動能消化</b>。"
+      : mUp ? "短期乖乖持平、中期乖乖變大：<b style=\"color:var(--green)\">下面的支撐在跟上來</b>。"
+      : mDn ? "短期乖乖持平、中期乖乖變小：<b style=\"color:var(--warn)\">中長期力道在收斂</b>。"
       : "短期、中期乖乖都和前一天一樣。";
   }
   // 乖乖動能：今天的變化和前一天的變化比
@@ -414,10 +447,10 @@ function summary(rows, valid){
     const d1 = last.s - prev.s, d0 = prev.s - valid[valid.length - 3].s, e = 0.05;
     const sg = x => (x >= 0 ? "+" : "") + x.toFixed(1);
     mom = `今天乖乖 ${sg(d1)}（前一天 ${sg(d0)}）：` + (
-      d1 > e && d0 <= e ? "<b>由縮轉增</b>，力道回來"
-      : d1 > e ? (d1 > d0 + e ? "<b>加速變大</b>" : "<b>還在變大，但速度變慢</b>")
-      : d1 < -e && d0 >= -e ? "<b>由增轉縮</b>，力道轉弱"
-      : d1 < -e ? (d1 < d0 - e ? "<b>縮得越來越快</b>" : "<b>還在縮，但速度變慢</b>")
+      d1 > e && d0 <= e ? "<b style=\"color:var(--green)\">由縮轉增，力道回來</b>"
+      : d1 > e ? (d1 > d0 + e ? "<b style=\"color:var(--green)\">加速變大</b>" : "<b style=\"color:var(--warn)\">還在變大，但速度變慢</b>")
+      : d1 < -e && d0 >= -e ? "<b style=\"color:var(--warn)\">由增轉縮，力道轉弱</b>"
+      : d1 < -e ? (d1 < d0 - e ? "<b style=\"color:var(--hot)\">縮得越來越快</b>" : "<b style=\"color:var(--green)\">還在縮，但速度變慢</b>")
       : "<b>持平</b>");
   }
   const card = STAT
@@ -544,12 +577,12 @@ function summary(rows, valid){
     const near20 = last.close != null && last.close <= last.m20 * 1.02;
     const both = prev && prev.m != null && last.s < prev.s && last.m < prev.m;
     const dead = near20 && both && weak(d20, a20);
+    const OK = '<b style="color:var(--hot)">✔</b>', NG = '<b style="color:var(--green)">✘</b>';   // 這裡的✔是「轉弱條件成立」＝壞消息
     fail = `6個轉弱條件，符合 <b>${hit.length}／6</b> 項（${lv}）` +
       (hit.length ? '：' + hit.map(c => c[0]).join('、') : '') +
       '<br>' + (dead ? '<b>已達結構失效</b>：收盤在20日線附近或以下、短中期乖乖同步變差、20日線轉弱，三個同時成立。'
-        : `還沒達到結構失效（要同時符合：收盤在20日線附近或以下${near20 ? '✔' : '✘'}、短中期乖乖同步變差${both ? '✔' : '✘'}、20日線轉弱${weak(d20, a20) ? '✔' : '✘'}）。`) +
-      (prev && last.s < prev.s && !(last.m < prev.m) ? '<br>短期乖乖回收但中期乖乖穩定，屬於動能消化，不算結構失效。' : '') +
-      '<br><span class="note">「明顯變慢」＝低於平均速度的一半；「無法站回」＝連續2天收在10日線下。</span>';
+        : `還沒達到結構失效（要同時符合：收盤在20日線附近或以下${near20 ? OK : NG}、短中期乖乖同步變差${both ? OK : NG}、20日線轉弱${weak(d20, a20) ? OK : NG}）。`) +
+      (prev && last.s < prev.s && !(last.m < prev.m) ? '<br>短期乖乖回收但中期乖乖穩定，屬於動能消化，不算結構失效。' : '');
     window.FUT = {P10: [1, 2, 3].map(P10), P20: [1, 2, 3].map(P20)};
     pl.push(`6個轉弱條件，目前符合 <b>${hit.length}</b> 項` + (hit.length ? `（${hit.map(c => c[0]).join('、')}）` : '') + (dead ? '，<b>已達結構失效</b>。' : hit.length >= 4 ? '，警戒高。' : hit.length >= 2 ? '，要注意。' : '，警戒低。'));
     if (hasClose){ const g1 = (P10(1) / last.close - 1) * 100, g2 = (P20(1) / last.close - 1) * 100;
@@ -570,7 +603,7 @@ function summary(rows, valid){
       `<span class="note">這一區直接用明天的收盤去算，收盤確定時數字就是準的（漲跌停價為約略值）。和上面的預測方向不同時，以明天實際收盤落在哪一格為準。</span>`;
   }
   const row = (k, v) => `<tr><th>${k}</th><td>${v}</td></tr>`;
-  $('summary').innerHTML = `
+  $('summary').innerHTML = hl(`
     <h2>${esc($('name').value || '這檔股票')}・${esc(last.date)}</h2>
     <div class="row" style="align-items:center;margin-top:0"><span class="note">${(tm => tm.k + "・" + tm.st + "：輸入價格")(tmode())}</span><input id="ip" type="number" step="any" inputmode="decimal" style="width:8em;padding:6px 8px"><button id="ipb" class="ghost zbtn">試算</button></div>
     <p class="note" style="margin:2px 0 8px">說明：輸入一個價格，網頁會把它當成${tmode().when}，用同一套算法重算乖乖、均線、回落區和白話解讀，可以先看「如果收在這個價會怎樣」。盤中（9:00–13:30）是試算今天；收盤資料更新後、週末或國定假日，是試算下個交易日。國定假日依證交所公告自動判斷；颱風等臨時休市無法判斷，請自行留意。</p>
@@ -582,9 +615,9 @@ function summary(rows, valid){
     ${mkPlain()}
     <details class="fold" ${innerWidth > 700 ? 'open' : ''}><summary>完整分析表（各項數值，點開看）</summary><div class="scroll"><table class="flow">
       ${row('5日線', f(last.m5))}
-      ${row('短期乖乖', `${f(last.s,1)}（原始比值 ${rr(last.m5, last.m10)}）　${z.t}`)}
+      ${row('短期乖乖', `<b style="color:var(${z.c})">${f(last.s,1)}</b>（原始比值 ${rr(last.m5, last.m10)}）　<b style="color:var(${z.c})">${z.t}</b>`)}
       ${row('10日線', f(last.m10))}
-      ${row('中期乖乖', last.m == null ? '需要20日線' : `${f(last.m,1)}（原始比值 ${rr(last.m10, last.m20)}）　${zone(last.m, TH2).t}`)}
+      ${row('中期乖乖', last.m == null ? '需要20日線' : `<b style="color:var(${zone(last.m, TH2).c})">${f(last.m,1)}</b>（原始比值 ${rr(last.m10, last.m20)}）　<b style="color:var(${zone(last.m, TH2).c})">${zone(last.m, TH2).t}</b>`)}
       ${row('20日線', f(last.m20))}
       ${row('短中期一起看', dual)}
       ${row('平均變化', `短期乖乖：全部 ${ch.length} 天平均每天 ${avgTxt}` + (down ? `，已連續縮減 ${down} 天` : '') +
@@ -598,7 +631,7 @@ function summary(rows, valid){
       ${row('均線5日延伸', ext5)}
       ${row('回落區', zones)}
       ${row('結構警戒／失效', fail)}
-    </table></div></details>`;
+    </table></div></details>`);
 }
 
 function chart(v, full){
