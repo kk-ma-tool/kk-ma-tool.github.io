@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>乖乖值計算器</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%93%88%3C/text%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700;900&display=swap" rel="stylesheet">
 <style>
@@ -158,7 +159,7 @@ table.mini th,table.mini td{padding:4px 10px}
       if (!IDX) return {error: '大盤資料還沒準備好，請稍後再試。'};
       var i0 = Math.max(0, IDX.d.length - 80), K = IDX.d[IDX.d.length - 1];
       return {stat: null, sp: '', adjNote: '', code: code, name: '加權指數（大盤）', market: '大盤',
-        last: Math.floor(K / 10000) + '/' + (Math.floor(K / 100) % 100) + '/' + (K % 100),
+        last: Math.floor(K / 10000) + '/' + (Math.floor(K / 100) % 100) + '/' + (K % 100), mlast: (Math.floor(K / 100) % 100) + '/' + (K % 100),
         rows: IDX.d.slice(i0).map(function (k, i) { return {date: (Math.floor(k / 100) % 100) + '/' + (k % 100), close: IDX.c[i0 + i]}; })};
     }
     var c = PX.c[code];
@@ -193,10 +194,10 @@ table.mini th,table.mini td{padding:4px 10px}
     var lim = /^00/.test(code) ? 0.3 : 0.11, cut = 0;
     for (var j = 1; j < ks.length; j++) if (!AD[ks[j]] && Math.abs(px[ks[j]] / px[ks[j - 1]] - 1) > lim) cut = j;
     if (cut) { note += '（' + (Math.floor(ks[cut] / 100) % 100) + '/' + (ks[cut] % 100) + ' 股價單日跳動超過 ' + Math.round(lim * 100) + '%，可能是減資或分割，均線只用這天起的資料計算）'; ks = ks.slice(cut); }
-    var L = ks[ks.length - 1];
+    var L = ks[ks.length - 1], ML = PX.d[PX.d.length - 1];
     return {
       stat: stat(code), sp: META ? String(META.from).replace(/^(\d{4})(\d\d)(\d\d)$/, function (m, y, mo, d) { return y + '/' + (+mo) + '/' + (+d); }) + '～' + String(META.to).replace(/^(\d{4})(\d\d)(\d\d)$/, function (m, y, mo, d) { return y + '/' + (+mo) + '/' + (+d); }) : '', adjNote: note, code: code, name: PX.n[code] || '', market: PX.m[code] || '',
-      last: Math.floor(L / 10000) + '/' + (Math.floor(L / 100) % 100) + '/' + (L % 100),
+      last: Math.floor(L / 10000) + '/' + (Math.floor(L / 100) % 100) + '/' + (L % 100), mlast: (Math.floor(ML / 100) % 100) + '/' + (ML % 100),
       rows: ks.map(function (k) { return {date: (Math.floor(k / 100) % 100) + '/' + (k % 100), close: px[k]}; })
     };
   }
@@ -361,6 +362,8 @@ function tmode(){
   const t = new Date(Date.now() + 8 * 3600e3), wd = t.getUTCDay(), hm = t.getUTCHours() * 100 + t.getUTCMinutes();
   const today = (t.getUTCMonth() + 1) + '/' + t.getUTCDate();
   const lastD = window.RAW && window.RAW.length ? window.RAW[window.RAW.length - 1].date : '';
+  const mk = window.MLAST || lastD;
+  if (lastD && mk && lastD !== mk) return {k: '下一筆收盤試算', row: '下一筆試算', when: '這檔下一筆收盤價', st: `這檔最新收盤日是 ${lastD}，全市場已更新到 ${mk}，這檔那之後沒有收盤價`};
   if (lastD === today) return {k: '下個交易日試算', row: '下個交易日', when: '下個交易日的收盤價', st: '今天的收盤資料已經更新'};
   if (wd === 0 || wd === 6) return {k: '下個交易日試算', row: '下個交易日', when: '下個交易日的收盤價', st: '週末休市'};
   const ymd = t.getUTCFullYear() * 10000 + (t.getUTCMonth() + 1) * 100 + t.getUTCDate();
@@ -371,7 +374,7 @@ function tmode(){
 }
 function intraday(){
   const p = parseFloat($('ip').value);
-  if (!(p > 0) || !window.RAW) return;
+  if (!window.RAW) return;
   // 合理範圍：最近正式收盤的 50%～150%，超出就不試算（避免極端數字算出無效結果）
   const lc = window.RAW[window.RAW.length - 1].close;
   if (!isFinite(p) || !(lc > 0) || p < lc * 0.5 || p > lc * 1.5){
@@ -825,7 +828,9 @@ async function auto(){
     TH = mkTH(STAT ? STAT.S / 8.2 : 1); TH2 = mkTH(STAT && STAT.S2 ? STAT.S2 / 11.46 : 1);
     const rows = r.rows.map(x => ({date: x.date, close: x.close, m5:null, m10:null, m20:null}));
     $('name').value = (r.name ? r.name + ' ' : '') + code;
-    $('autoMsg').textContent = `${r.market}・已抓到最近 ${rows.length} 個交易日，最新收盤日 ${r.last}。` + (r.adjNote || '');
+    window.MLAST = r.mlast || '';
+    const lagD = rows.length && r.mlast && rows[rows.length - 1].date !== r.mlast ? rows[rows.length - 1].date : '';
+    $('autoMsg').textContent = `${r.market}・已抓到最近 ${rows.length} 個交易日，最新收盤日 ${r.last}。` + (lagD ? `（全市場已更新到 ${r.mlast}，這檔那之後沒有收盤價；下面說的「今天」是指 ${lagD}）` : '') + (r.adjNote || '');
     window.RAW = r.rows;
     const all = compute(rows);
     if (!all.some(x => x.s != null)) return fail('這檔交易日數不足 10 天，算不出乖乖。' + (r.adjNote || ''));
