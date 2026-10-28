@@ -728,7 +728,7 @@ function priceChart(rows, full){
     s += `<polygon points="${t2}${b2}" fill="${C.z}" opacity=".14"/>`;
     s += `<line x1="${x(n - 1) + step / 2}" x2="${x(n - 1) + step / 2}" y1="${T}" y2="${H - B}" stroke="${css('--sub')}" stroke-dasharray="3 3"/>`;
     const ya = y(F.P10[0]), yb = y(F.P20[0]), tenUp = ya <= yb;   // 位置比較高的那個點，字放上面；比較低的，字放下面
-    const lab = (yy, up, t, v, c) => { let t1 = up ? yy - 28 : yy + 20, t2 = t1 + 18; if (up && t1 < T + 30){ t1 = T + 30; t2 = t1 + 18; } if (!up && t2 > H - B - 4){ t2 = H - B - 4; t1 = t2 - 18; }
+    const lab = (yy, up, t, v, c) => { let t1 = up ? yy - 32 : yy + 20, t2 = t1 + 22; if (up && t1 < T + 30){ t1 = T + 30; t2 = t1 + 22; } if (!up && t2 > H - B - 4){ t2 = H - B - 4; t1 = t2 - 22; }
       return `<text x="${x(n) + 9}" y="${t1}" font-size="14" fill="${c}">${t}</text><text x="${x(n) + 9}" y="${t2}" font-size="14" font-weight="700" fill="${c}">${v}</text>`; };
     s += `<circle cx="${x(n)}" cy="${ya}" r="5" fill="${C.m10}"/><circle cx="${x(n)}" cy="${yb}" r="5" fill="${C.m20}"/>`;
     const up1 = lab(tenUp ? ya : yb, true, tenUp ? '明天 第一回落區' : '明天 結構防守', f(tenUp ? F.P10[0] : F.P20[0]), tenUp ? C.m10 : C.m20);
