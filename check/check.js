@@ -23,7 +23,7 @@ const hard = [], warn = [];
     if (err){ (/交易日數不足 10 天/.test(err) ? warn : hard).push(`${name}：${err}`); continue; }
     if (!txt.trim()) { hard.push(`${name}：畫面是空白的`); continue; }
     if (/NaN|undefined|Infinity/.test(txt + $('tbl').textContent)) { hard.push(`${name}：畫面出現 NaN／undefined`); continue; }
-    const cl = +((txt.match(/收盤 ([\d.]+) 元，離5日線/) || [])[1]), p10 = +((txt.match(/第一回落區（強勢回測，預估10日線附近）：明天約 ([\d.]+)/) || [])[1]);
+    const cl = +((txt.match(/收盤 ([\d.]+) 元，離5日線/) || [])[1]), p10 = +((txt.match(/第一回落區（強勢回測，約10日線）：明天約 ([\d.]+)/) || [])[1]);
     if (cl && p10 && Math.abs(p10 / cl - 1) > 0.3) warn.push(`${name}：第一回落區 ${p10} 離收盤 ${cl} 超過 30%，可能有沒還原的減資或分割`);
     ok++;
   }
