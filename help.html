@@ -80,14 +80,14 @@ table.mini th,table.mini td{padding:4px 10px}
 <section class="panel">
 <h2>乖乖值是什麼</h2>
 <p>乖乖值＝<b>5日線 ÷ 10日線</b>換算出來的數字，看短線均線被拉開多少。<br>
-數字越大＝短線越熱；數字是負的＝5日線已經跌到10日線下面。</p>
+原始比值（5日線÷10日線）四捨五入到小數三位後換算，例如 1.017 → 乖乖 1.7。數字越大＝短線越熱。<br>原始比值小於1（5日線跌到10日線下面）時，網頁直接顯示原始比值，例如 0.986。</p>
 <p class="hint">每檔股票的「熱度標準」不一樣，網頁已經依這檔過去的表現換算好，<b>直接看顏色就好</b>，不用背數字。</p>
 </section>
 
 <section class="panel">
 <h2>看顏色：現在在哪一區</h2>
 <table class="flow">
-<tr><th><i class="dot" style="background:var(--sub)"></i>灰（負數）</th><td>5日線在10日線下，短線偏弱，<b style="color:var(--hot)">這套看法不適用</b>，先觀望。</td></tr>
+<tr><th><i class="dot" style="background:var(--sub)"></i>灰（小於1）</th><td>5日線在10日線下，短線偏弱，<b style="color:var(--hot)">這套看法不適用</b>，先觀望。</td></tr>
 <tr><th><i class="dot" style="background:var(--cold)"></i>藍｜低檔</th><td>還沒熱起來，<b>位置最好</b>；但要確認股價站在5日線上，才算開始動。</td></tr>
 <tr><th><i class="dot" style="background:var(--five)"></i>金黃｜5香</th><td><b style="color:var(--green)">最理想的區間</b>：漲勢健康、不過熱，適合等待或續抱。</td></tr>
 <tr><th><i class="dot" style="background:var(--mid)"></i>橄欖｜過渡</th><td>開始偏熱，不急著加碼。</td></tr>
@@ -99,12 +99,12 @@ table.mini th,table.mini td{padding:4px 10px}
 <section class="panel">
 <h2>看方向：比數字本身更重要</h2>
 <table class="flow">
-<tr><th>正數，變大</th><td>力道在加強。<br>在藍、金黃區變大＝<b style="color:var(--green)">好事</b>；在橘、紅區還在變大＝越來越熱，<b style="color:var(--hot)">追高風險變大</b>。</td></tr>
-<tr><th>正數，變小</th><td>短線在降溫。<br>從高區（橘、紅）回落＝降溫中，<b>等它回到5香區再看</b>；在5香區小幅回落＝<b style="color:var(--green)">正常休息</b>。</td></tr>
-<tr><th>正數 → 負數</th><td>5日線跌破10日線，<b style="color:var(--warn)">短線轉弱</b>。剛轉負先觀望，不急著進場。</td></tr>
-<tr><th>負數，越來越負</th><td><b style="color:var(--hot)">還在走弱</b>，不碰。</td></tr>
-<tr><th>負數，往0靠近</th><td>跌勢在減緩，<b style="color:var(--green)">開始好轉</b>，但還不是進場時機。</td></tr>
-<tr><th>負數 → 正數</th><td>5日線重新站回10日線，<b style="color:var(--green)">轉強的起點</b>。<br>剛轉正會落在藍色低檔區；接下來看三件事：股價站穩5日線、乖乖繼續變大、中期乖乖也跟上。</td></tr>
+<tr><th>1以上，變大</th><td>力道在加強。<br>在藍、金黃區變大＝<b style="color:var(--green)">好事</b>；在橘、紅區還在變大＝越來越熱，<b style="color:var(--hot)">追高風險變大</b>。</td></tr>
+<tr><th>1以上，變小</th><td>短線在降溫。<br>從高區（橘、紅）回落＝降溫中，<b>等它回到5香區再看</b>；在5香區小幅回落＝<b style="color:var(--green)">正常休息</b>。</td></tr>
+<tr><th>1以上 → 小於1</th><td>5日線跌破10日線，<b style="color:var(--warn)">短線轉弱</b>。剛轉負先觀望，不急著進場。</td></tr>
+<tr><th>小於1，越來越小</th><td><b style="color:var(--hot)">還在走弱</b>，不碰。</td></tr>
+<tr><th>小於1，往1靠近</th><td>跌勢在減緩，<b style="color:var(--green)">開始好轉</b>，但還不是進場時機。</td></tr>
+<tr><th>小於1 → 回到1以上</th><td>5日線重新站回10日線，<b style="color:var(--green)">轉強的起點</b>。<br>剛轉正會落在藍色低檔區；接下來看三件事：股價站穩5日線、乖乖繼續變大、中期乖乖也跟上。</td></tr>
 </table>
 </section>
 
@@ -117,10 +117,24 @@ table.mini th,table.mini td{padding:4px 10px}
 
 <section class="panel">
 <h2>中期乖乖（10日線 ÷ 20日線）</h2>
-<p>看中長期的底子穩不穩，搭配短期一起看：</p>
+<p>看中長期的底子穩不穩，網頁以原始比值為主（例如 1.033），搭配短期一起看：</p>
 <p>・短期變小、中期穩住或變大＝<b style="color:var(--green)">動能消化</b>，不用緊張<br>
 ・短期、中期一起變大＝<b style="color:var(--green)">整體力道在加強</b><br>
 ・短期、中期一起變小，而且連續好幾天＝<b style="color:var(--warn)">要提高警覺</b></p>
+</section>
+
+<section class="panel">
+<h2>乖乖走勢圖怎麼看</h2>
+<p>・實線＝短期原始比值，虛線＝中期原始比值；點上的數字是乖乖值（小於1時是原始比值）。<br>
+・背景四段：潛伏期（1.000～1.025）、主升啟動帶（1.025～1.050）、主升延伸帶（1.050～1.080）、高乖離區（1.080以上）。<br>
+・下方長條＝短期原始比值每天的實際變化：綠往上＝變大，紅往下＝變小。</p>
+</section>
+
+<section class="panel">
+<h2>手動輸入</h2>
+<p>首頁的「手動輸入均線（原版格式）」可以自己貼資料，每行一天：<br>
+<b>日期 5日線 10日線 20日線</b>，有收盤價就寫 <b>日期 收盤 5日線 10日線 20日線</b>。<br>
+平均變化會用貼進去的全部資料計算。</p>
 </section>
 
 <section class="panel">
