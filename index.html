@@ -75,6 +75,8 @@ table.mini th,table.mini td{padding:4px 10px}
 .pclg{flex:0 0 150px;flex-direction:column;flex-wrap:nowrap;gap:4px;margin-top:0;font-size:.8rem;line-height:1.4;color:var(--ink)}
 #pchart{flex:1;min-width:0}
 #chart svg,#pchart svg{width:100%;height:auto}
+.mhint{display:none;font-size:.85rem;color:var(--sub);margin:4px 0}
+@media (max-width:700px){#chart svg,#pchart svg{width:auto;max-width:none}.mhint{display:block}}
 @media (max-width:700px){.pcwrap{flex-direction:column}.pclg{flex-direction:row;flex-wrap:wrap;flex-basis:auto}}
 </style>
 </head>
@@ -92,11 +94,6 @@ table.mini th,table.mini td{padding:4px 10px}
     <div id="pick" class="row"></div>
     <div id="err" class="err" hidden></div>
     <div id="candOut"></div>
-    <details id="manFold" class="fold"><summary>手動輸入均線（原版格式）</summary>
-      <p class="hint">每行一天：<b>日期 5日線 10日線 20日線</b>；有收盤價就寫成：<b>日期 收盤 5日線 10日線 20日線</b>。數字用空白或逗號隔開，第一行可以寫股票名稱。</p>
-      <textarea id="man" rows="7" style="width:100%;font:inherit;padding:8px;border-radius:10px;border:1px solid var(--line);background:var(--panel);color:var(--ink)" placeholder="南電&#10;10/23 275.9 273.1 254.32&#10;10/27 275.5 274.45 256.52"></textarea>
-      <div class="row"><button id="manBtn">用手動資料計算</button></div>
-    </details>
   </section>
 
   <input id="name" type="hidden" value="">
@@ -105,11 +102,13 @@ table.mini th,table.mini td{padding:4px 10px}
     <section class="panel" id="summary"></section>
     <section class="panel">
       <div class="phead"><h2>乖乖走勢</h2><button class="ghost zbtn" id="kzoom">放大看</button></div>
+      <p class="mhint">圖可以左右滑動，最新的在最右邊</p>
       <div id="chart" class="scroll"></div>
       <div class="legend" id="legend"></div>
     </section>
     <section class="panel">
       <details id="dailyFold" class="fold"><summary>每日明細（點開看）</summary>
+      <p class="mhint">表格可以左右滑動</p>
       <div class="scroll"><table id="tbl"></table></div></details>
     </section>
   </div>
@@ -258,8 +257,10 @@ function kk(a, b){
   return kr(a / b);
 }
 // 顯示：原始比值小於 1（乖乖為負）時，以原始比值為準，不顯示負的乖乖值
-const sd = r => r.s == null ? '—' : r.s < 0 ? r.rs.toFixed(3) : f(r.s, 1);
-const qd = q => q == null ? '—' : kr(q) < 0 ? q.toFixed(3) : f(kr(q), 1);
+const sd = r => r.s == null ? '—' : r.s < 0 ? rt(r.rs) : f(r.s, 1);
+// 原始比值文字：小於 1 但三位小數會變成 1.000 時，多顯示一位（例如 0.9998），避免看起來等於 1
+const rt = q => q == null ? '—' : (q < 1 && q.toFixed(3) === '1.000') ? q.toFixed(4) : q.toFixed(3);
+const qd = q => q == null ? '—' : q < 1 ? rt(q) : f(kr(q), 1);
 // 區間標準：作者原始為 4／7／9／11；有個股股性時，依這檔過去的乖乖幅度等比例調整
 const r1 = x => Math.round(x * 10) / 10;
 function mkTH(k){ return {k, l: r1(3 * k), fl: r1(4 * k), fh: r1(7 * k), w: r1(9 * k), h: r1(11 * k)}; }
@@ -331,6 +332,9 @@ function compute(rows){
     r.s = kk(r.m5, r.m10); r.m = kk(r.m10, r.m20);
     r.rs = (r.m5 != null && r.m10) ? r.m5 / r.m10 : null;    // 短期原始比值
     r.rm = (r.m10 != null && r.m20) ? r.m10 / r.m20 : null;  // 中期原始比值
+    // 原版：方向以未捨入的原始比值為準；比值小於 1 卻四捨五入成 0 時，仍當成「小於1」
+    if (r.rs != null && r.rs < 1 && r.s >= 0) r.s = -0.01;
+    if (r.rm != null && r.rm < 1 && r.m >= 0) r.m = -0.01;
   });
   return rows;
 }
@@ -537,7 +541,7 @@ function summary(rows, valid){
     (watch.length ? `<div style="margin-top:8px"><b>接下來看這些價位：</b><br>${watch.map(w => '・' + w).join('<br>')}</div>` : '') +
     `<div class="note" style="margin-top:8px">以上只是參考，不是買賣建議。</div></div>`;
   // ===== 依原版「完整核對版」規格：原始比值、啟動觀察、三層回落區、5日延伸、結構失效條件 =====
-  const rr = (a, b) => (a != null && b) ? (a / b).toFixed(3) : '—';
+  const rr = (a, b) => (a != null && b) ? rt(a / b) : '—';
   const chg = key => { const a = []; for (let i = 1; i < vr.length; i++) if (vr[i][key] != null && vr[i - 1][key] != null) a.push(vr[i][key] - vr[i - 1][key]); return a; };
   const avgOf = a => a.length ? a.reduce((x, y) => x + y, 0) / a.length : null;
   let c5 = chg('m5'), c10 = chg('m10'); const c20 = chg('m20');
@@ -551,10 +555,10 @@ function summary(rows, valid){
     const st0 = stageOf(r0), st1 = stageOf(r1);
     const p20 = (a20 != null && last.m20) ? last.m20 + a20 : null;
     pred = `依最新均線＋平均每天變化推估：明天5日線約 <b>${f(p5)}</b>、10日線約 <b>${f(p10)}</b>` + (p20 ? `、20日線約 <b>${f(p20)}</b>` : '') +
-      ` 元；短期原始比值約 ${r1.toFixed(3)}` + (kr(r1) >= 0 ? `（乖乖 <b>${f(kr(r1), 1)}</b>）` : '') +
-      (p20 ? `、中期原始比值約 ${(p10 / p20).toFixed(3)}` + (kr(p10 / p20) >= 0 ? `（乖乖 <b>${f(kr(p10 / p20), 1)}</b>）` : '') : '') + `。${winTxt}`;
-    kick = `現在原始比值 ${r0.toFixed(3)}` + (kr(r0) >= 0 ? `（乖乖 <b>${f(kr(r0), 1)}</b>，${st0}）` : `（${st0}）`) +
-      ` → 預估明天原始比值 ${r1.toFixed(3)}` + (kr(r1) >= 0 ? `（乖乖 <b>${f(kr(r1), 1)}</b>，${st1}）。` : `（${st1}）。`) +
+      ` 元；短期原始比值約 ${rt(r1)}` + (r1 >= 1 ? `（乖乖 <b>${f(kr(r1), 1)}</b>）` : '') +
+      (p20 ? `、中期原始比值約 ${rt(p10 / p20)}` + (p10 / p20 >= 1 ? `（乖乖 <b>${f(kr(p10 / p20), 1)}</b>）` : '') : '') + `。${winTxt}`;
+    kick = `現在原始比值 ${rt(r0)}` + (r0 >= 1 ? `（乖乖 <b>${f(kr(r0), 1)}</b>，${st0}）` : `（${st0}）`) +
+      ` → 預估明天原始比值 ${rt(r1)}` + (r1 >= 1 ? `（乖乖 <b>${f(kr(r1), 1)}</b>，${st1}）。` : `（${st1}）。`) +
       (st0 === '潛伏期' && st1 === '主升啟動帶' ? '<b>由潛伏期往主升啟動帶移動</b>，是啟動觀察訊號。'
         : st0 === st1 ? `預估還停在${st1}。` : `預估由${st0}移到${st1}。`) + winTxt;
   }
@@ -628,7 +632,7 @@ function summary(rows, valid){
       <span class="note">${last.s < 0 ? '短期原始比值（5日線 ÷ 10日線，小於1）' : '短期乖乖（5日線 ÷ 10日線）'}・${STAT ? '依這檔股性的標準' : (MODE === 'auto' ? '無個股參考資訊' : '無個股參考資訊')}</span></div>
     </div>
     ${mkPlain()}
-    <details class="fold" ${innerWidth > 700 ? 'open' : ''}><summary>完整分析表（各項數值，點開看）</summary><div class="scroll"><table class="flow">
+    <details class="fold" ${innerWidth > 700 ? 'open' : ''}><summary>完整分析表（各項數值，點開看）</summary><p class="mhint">表格可以左右滑動</p><div class="scroll"><table class="flow">
       ${row('5日線', f(last.m5))}
       ${row('短期乖乖', `原始比值 <b>${rr(last.m5, last.m10)}</b>` + (last.s >= 0 ? `｜乖乖 <b style="color:var(${z.c})">${f(last.s,1)}</b>` : '') + `　<b style="color:var(${z.c})">${z.t}</b>`)}
       ${row('10日線', f(last.m10))}
@@ -688,7 +692,7 @@ function priceChart(rows, full){
   if (!$('pchart')){
     const sec = document.createElement('section'); sec.className = 'panel';
     sec.innerHTML = '<div class="phead"><h2>收盤與均線</h2><button class="ghost zbtn" id="pzoom">放大看</button></div>' +
-      '<div class="pcwrap"><div class="legend pclg" id="pcLg"></div><div id="pchart" class="scroll"></div></div>';
+      '<p class="mhint">圖可以左右滑動，最新的在最右邊</p><div class="pcwrap"><div class="legend pclg" id="pcLg"></div><div id="pchart" class="scroll"></div></div>';
     const ref = $('chart').closest('section'); ref.parentNode.insertBefore(sec, ref);
     $('pzoom').onclick = () => zoomSvg('pchart', 'pcLg');
   }
@@ -717,8 +721,13 @@ function priceChart(rows, full){
     for (let d = 0; d < 3; d++){ t2 += `${x(n + d)},${y(Math.max(F.P10[d], F.P20[d]))} `; b2 = `${x(n + d)},${y(Math.min(F.P10[d], F.P20[d]))} ` + b2; }
     s += `<polygon points="${t2}${b2}" fill="${C.z}" opacity=".14"/>`;
     s += `<line x1="${x(n - 1) + step / 2}" x2="${x(n - 1) + step / 2}" y1="${T}" y2="${H - B}" stroke="${css('--sub')}" stroke-dasharray="3 3"/>`;
-    s += `<circle cx="${x(n)}" cy="${y(F.P10[0])}" r="5" fill="${C.m10}"/><text x="${x(n) + 9}" y="${y(F.P10[0]) - 4}" font-size="14" fill="${C.m10}">明天 第一回落區</text><text x="${x(n) + 9}" y="${y(F.P10[0]) + 12}" font-size="14" font-weight="700" fill="${C.m10}">${f(F.P10[0])}</text>`;
-    s += `<circle cx="${x(n)}" cy="${y(F.P20[0])}" r="5" fill="${C.m20}"/><text x="${x(n) + 9}" y="${y(F.P20[0]) + 18}" font-size="14" fill="${C.m20}">明天 結構防守</text><text x="${x(n) + 9}" y="${y(F.P20[0]) + 34}" font-size="14" font-weight="700" fill="${C.m20}">${f(F.P20[0])}</text>`;
+    const ya = y(F.P10[0]), yb = y(F.P20[0]), tenUp = ya <= yb;   // 位置比較高的那個點，字放上面；比較低的，字放下面
+    const lab = (yy, up, t, v, c) => { let t1 = up ? yy - 24 : yy + 18, t2 = t1 + 16; if (up && t1 < T + 30){ t1 = T + 30; t2 = t1 + 16; } if (!up && t2 > H - B - 4){ t2 = H - B - 4; t1 = t2 - 16; }
+      return `<text x="${x(n) + 9}" y="${t1}" font-size="14" fill="${c}">${t}</text><text x="${x(n) + 9}" y="${t2}" font-size="14" font-weight="700" fill="${c}">${v}</text>`; };
+    s += `<circle cx="${x(n)}" cy="${ya}" r="5" fill="${C.m10}"/><circle cx="${x(n)}" cy="${yb}" r="5" fill="${C.m20}"/>`;
+    const up1 = lab(tenUp ? ya : yb, true, tenUp ? '明天 第一回落區' : '明天 結構防守', f(tenUp ? F.P10[0] : F.P20[0]), tenUp ? C.m10 : C.m20);
+    const dn1 = lab(tenUp ? yb : ya, false, tenUp ? '明天 結構防守' : '明天 第一回落區', f(tenUp ? F.P20[0] : F.P10[0]), tenUp ? C.m20 : C.m10);
+    s += up1 + dn1;
     s += `<text x="${x(n + 1)}" y="${T - 8}" font-size="15" text-anchor="middle" fill="${css('--sub')}">未來3天</text>`;
   }
   s += line('m20', C.m20, 2.2) + line('m10', C.m10, 2.2) + line('m5', C.m5, 2.2) + line('close', C.c, 3);
@@ -767,8 +776,8 @@ function table(rows){
     const q = rows[ri - 1], d = (q && q.rs != null && r.rs != null) ? r.rs - q.rs : null;
     if (ri >= st) h += `<tr><td>${esc(r.date)}</td><td>${f(r.close)}</td><td>${f(r.m5)}</td><td>${f(r.m10)}</td><td>${f(r.m20)}</td>
       <td>${dv(r, q, 'm5')}</td><td>${dv(r, q, 'm10')}</td><td>${dv(r, q, 'm20')}</td>
-      <td>${r.rs == null ? '—' : r.rs.toFixed(3)}</td><td><i class="dot" style="background:var(${zone(r.s).c})"></i>${r.s == null || r.s < 0 ? '—' : f(r.s,1)}</td>
-      <td>${r.rm == null ? '—' : r.rm.toFixed(3)}</td><td>${r.m == null || r.m < 0 ? '—' : f(r.m,1)}</td>
+      <td>${rt(r.rs)}</td><td><i class="dot" style="background:var(${zone(r.s).c})"></i>${r.s == null || r.s < 0 ? '—' : f(r.s,1)}</td>
+      <td>${rt(r.rm)}</td><td>${r.m == null || r.m < 0 ? '—' : f(r.m,1)}</td>
       <td>${d == null ? '—' : Math.abs(d) < 0.00005 ? '0.0000' : (d > 0 ? '▲+' : '▼') + d.toFixed(4)}</td></tr>`;
   });
   $('tbl').innerHTML = h;
@@ -820,27 +829,6 @@ async function auto(){
   finally { $('auto').disabled = false; }
 }
 $('auto').onclick = auto;
-// 手動輸入均線（原版格式）：日期 5MA 10MA 20MA，或 日期 收盤 5MA 10MA 20MA
-function manual(){
-  const lines = $('man').value.split(/\n/).map(x => x.trim()).filter(Boolean);
-  let name = '', bad = 0; const rows = [];
-  lines.forEach(l => {
-    const t = l.split(/[\s,，、]+/).filter(Boolean);
-    if (!/^\d{1,4}[\/\-.]\d{1,2}/.test(t[0])){ if (!rows.length && !name) name = l; else bad++; return; }
-    const n = t.slice(1).map(Number);
-    if (n.length === 3 && n.every(v => v > 0)) rows.push({date: t[0], close: null, m5: n[0], m10: n[1], m20: n[2]});
-    else if (n.length === 4 && n.every(v => v > 0)) rows.push({date: t[0], close: n[0], m5: n[1], m10: n[2], m20: n[3]});
-    else bad++;
-  });
-  $('err').hidden = true; $('pick').innerHTML = '';
-  if (rows.length < 2){ $('err').textContent = '手動資料至少要 2 天，每行：日期 5日線 10日線 20日線（或 日期 收盤 5日線 10日線 20日線）。'; $('err').hidden = false; return; }
-  STAT = null; TH = mkTH(1); TH2 = mkTH(1); MODE = 'manual'; window.RAW = null;
-  $('name').value = name || '手動輸入';
-  const all = compute(rows); window.ALLR = all;
-  $('autoMsg').textContent = `手動輸入 ${rows.length} 天` + (rows.every(r => r.close != null) ? '（含收盤價：能量版）' : '（標準版）') + (bad ? `，有 ${bad} 行看不懂已略過` : '') + '。平均變化用全部輸入的資料。';
-  render(all.slice(-30));
-}
-$('manBtn').onclick = manual;
 $('code').onkeydown = e => { if (e.key === 'Enter') auto(); };
 // 邊打字邊列出符合的股票名稱
 let sugT = 0;
